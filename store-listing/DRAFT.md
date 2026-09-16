@@ -31,9 +31,9 @@ extension itself — excluded from the packaged zip via `.gitattributes`.
 
 ## Privacy policy URL
 
-`https://novaworks-ai.github.io/exp-bugbash-extension/privacy-policy.html`
-(requires GitHub Pages enabled on this repo, `main` branch, `/docs` folder — see repo Settings →
-Pages if this 404s)
+`https://github.com/Novaworks-ai/exp-bugbash-extension/blob/main/PRIVACY.md`
+(GitHub Pages creation is disabled at the org level, so this uses GitHub's own rendered-Markdown
+view instead of a hosted HTML page — CWS review accepts this as a valid privacy policy URL.)
 
 ## Single purpose statement (required by CWS review)
 
