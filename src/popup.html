@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Bug Bash Capture</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <span class="brand-name">Bug Bash</span>
+      <span class="version-badge" id="version-badge">v0.1.0</span>
+    </div>
+    <div class="connect-status" id="connect-status">
+      <span class="dot dot-off" id="connect-dot"></span>
+      <span id="connect-label">Not connected</span>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="capture">Capture</button>
+    <button class="tab" data-tab="queue">Queue</button>
+    <button class="tab" data-tab="history">History</button>
+    <button class="tab" data-tab="settings">Settings</button>
+  </nav>
+
+  <main class="panels">
+    <section class="panel active" id="panel-capture">
+      <div id="capture-idle">
+        <button class="primary-btn" id="btn-capture">Capture this page</button>
+        <p class="hint">Grabs a screenshot of the visible tab, then add a description.</p>
+      </div>
+
+      <div id="capture-preview" class="hidden">
+        <img id="preview-img" alt="Screenshot preview" />
+        <label class="field-label" for="description">What's wrong?</label>
+        <textarea id="description" rows="4" placeholder="Describe the bug you saw..."></textarea>
+        <div class="page-meta" id="page-meta"></div>
+        <div class="row">
+          <button class="secondary-btn" id="btn-retake">Retake</button>
+          <button class="primary-btn" id="btn-submit">Submit</button>
+        </div>
+      </div>
+
+      <div id="capture-status" class="status hidden"></div>
+    </section>
+
+    <section class="panel" id="panel-queue">
+      <div class="panel-toolbar">
+        <span class="panel-title">Open items</span>
+        <button class="link-btn" id="btn-refresh-queue">Refresh</button>
+      </div>
+      <ul class="item-list" id="queue-list"></ul>
+      <p class="empty-hint hidden" id="queue-empty">Nothing open. Connect and submit a capture to get started.</p>
+    </section>
+
+    <section class="panel" id="panel-history">
+      <div class="panel-toolbar">
+        <span class="panel-title">Resolved</span>
+        <button class="link-btn" id="btn-refresh-history">Refresh</button>
+      </div>
+      <ul class="item-list" id="history-list"></ul>
+      <p class="empty-hint hidden" id="history-empty">No resolved items yet.</p>
+    </section>
+
+    <section class="panel" id="panel-detail">
+      <button class="link-btn" id="btn-detail-back">‹ Back</button>
+      <div class="detail-desc" id="detail-description"></div>
+      <div class="page-meta" id="detail-meta"></div>
+      <div class="detail-status" id="detail-status-row"></div>
+
+      <div id="detail-resolution" class="status hidden"></div>
+
+      <div id="detail-clarifications"></div>
+
+      <div id="detail-answer-box" class="hidden">
+        <label class="field-label" for="detail-answer">Open question</label>
+        <p class="hint" id="detail-question"></p>
+        <textarea id="detail-answer" rows="3" placeholder="Your answer..."></textarea>
+        <button class="primary-btn" id="btn-detail-answer-submit">Send answer</button>
+      </div>
+      <div class="status hidden" id="detail-status"></div>
+    </section>
+
+    <section class="panel" id="panel-settings">
+      <label class="field-label" for="backend-url">Intake service URL</label>
+      <input type="text" id="backend-url" placeholder="http://localhost:8000" />
+      <p class="hint">
+        Which focus-area queue a capture lands in is decided by the intake service itself
+        (from your description), not set here.
+      </p>
+
+      <div class="divider"></div>
+
+      <label class="field-label" for="auth-token">Access token (optional)</label>
+      <input type="password" id="auth-token" placeholder="Entra ID access token" />
+      <button class="secondary-btn" id="btn-connect">Connect</button>
+      <p class="hint">
+        Leave blank against a locally-run intake service started with
+        <code>AUTH_DISABLED=true</code> — every request is then treated as one dev filer,
+        no token needed. A real deployment requires a real Entra ID access token here; a
+        full in-extension OAuth Connect flow isn't wired up in this build — see README.
+      </p>
+
+      <div class="row">
+        <button class="primary-btn" id="btn-save-settings">Save</button>
+        <button class="link-btn" id="btn-test-connection">Test connection</button>
+      </div>
+      <div class="status hidden" id="settings-status"></div>
+    </section>
+  </main>
+
+  <script src="settings.js"></script>
+  <script src="api.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

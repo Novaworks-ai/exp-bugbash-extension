@@ -3,7 +3,44 @@
 Generic Chrome/Edge (Manifest V3) capture extension for **any** Novaworks bug bash — not specific
 to any one consuming repo.
 
-**Nothing is built yet.** This README is the spec this repo starts from, per the design worked out
+## Status: first cut, runnable locally
+
+A working extension exists under [`src/`](src/) — Capture / Queue / History / Settings tabs,
+`chrome.tabs.captureVisibleTab()` capture, submit to a configured intake service, an in-popup
+clarification answer flow, and a background poll that raises a notification once an item is marked
+fixed/unsolved. Everything past this section is the original design spec this build started from —
+still accurate as the target shape, kept as-is rather than rewritten now.
+
+### Running it locally
+
+1. Start [`exp-bugbash-intake-py`](https://github.com/Novaworks-ai/exp-bugbash-intake-py) locally
+   (see its own README) — for local trial, run it with `AUTH_DISABLED=true` so every request is
+   treated as one dev filer and no token is needed.
+2. Load this extension unpacked: `chrome://extensions` → enable Developer mode → **Load unpacked**
+   → select this repo's root directory (the one containing `manifest.json`).
+3. Open the extension popup → **Settings** tab → set **Intake service URL** to
+   `http://localhost:8000` (or whatever port you ran the backend on) → **Save**. Leave **Access
+   token** blank against an `AUTH_DISABLED=true` backend.
+4. **Capture** tab → **Capture this page** → add a description → **Submit**.
+5. **Queue** tab shows it; if the critique engine has an open question, clicking the item opens an
+   in-popup detail view with an answer box — answering re-runs critique/routing immediately.
+6. Mark an item resolved directly against the backend to see the fix-ready notification, e.g.:
+   `curl -X PATCH http://localhost:8000/captures/<id>/resolution -H "Content-Type: application/json" -d '{"resolution":"fixed"}'`
+   — the background poll picks it up within a minute (or click **Refresh** on the **History** tab).
+
+### Known gaps in this first cut
+
+- **Auth** is a plain bearer token pasted into Settings, not a real in-extension Entra ID OAuth
+  Connect flow — fine for local trial against an `AUTH_DISABLED=true` backend or a manually-obtained
+  token, not yet what a real multi-tester bug bash needs.
+- No offline queueing (matches the non-goal below) and no retry — a failed submit must be redone by
+  hand.
+
+Everything below this point is the original pre-build spec, kept as the design record.
+
+---
+
+This README is the spec this repo started from, per the design worked out
 in `local-sn`'s
 [`problems/049-manual-exploratory-testing.md`](https://github.com/Novaworks-ai/local-sn/blob/main/problems/049-manual-exploratory-testing.md)
 and its own published architecture diagram ("Bug Bash Pipeline"). That design was framed around
