@@ -15,6 +15,168 @@ function hideStatus(el) {
   el.classList.add("hidden");
 }
 
+// ---------------------------------------------------------------------
+// Connect gate: ask for the intake service URL, then (unless it runs with
+// auth disabled) drive a real Sign in with Microsoft flow. This is the
+// extension's only path to getting connected — nothing is usable until
+// this resolves, and there is no separate place asking for a pasted token.
+// ---------------------------------------------------------------------
+
+function showGateStep(name, serviceUrl) {
+  $("gate").classList.remove("hidden");
+  $("app-shell").classList.add("hidden");
+  $("gate-step-url").classList.toggle("hidden", name !== "url");
+  $("gate-step-login").classList.toggle("hidden", name !== "login");
+  if (name === "login") {
+    $("gate-service-label").textContent = `Signing in to ${serviceUrl}`;
+  }
+}
+
+const PENDING_CAPTURE_KEY = "pendingCaptureId"; // set by background.js on notification click
+
+async function showApp() {
+  $("gate").classList.add("hidden");
+  $("app-shell").classList.remove("hidden");
+  await refreshConnectBadge();
+  await refreshSettingsPanel();
+  await openPendingCaptureIfAny();
+}
+
+async function openPendingCaptureIfAny() {
+  const stored = await chrome.storage.local.get(PENDING_CAPTURE_KEY);
+  const pendingId = stored[PENDING_CAPTURE_KEY];
+  if (!pendingId) return;
+  await chrome.storage.local.remove(PENDING_CAPTURE_KEY);
+  await openDetail(pendingId);
+}
+
+async function resolveConnection() {
+  const settings = await getSettings();
+
+  if (!settings.backendUrl) {
+    showGateStep("url");
+    return;
+  }
+
+  if (settings.authDisabled) {
+    showApp();
+    return;
+  }
+
+  if (isTokenValid(settings)) {
+    showApp();
+    return;
+  }
+
+  if (settings.authRefreshToken) {
+    try {
+      await refreshEntraToken(entraConfigFrom(settings), settings.authRefreshToken);
+      showApp();
+      return;
+    } catch (_) {
+      // Refresh token is gone/revoked — fall through to an interactive login.
+    }
+  }
+
+  showGateStep("login", settings.backendUrl);
+}
+
+async function handleGateContinue() {
+  const statusEl = $("gate-url-status");
+  const backendUrl = $("gate-backend-url").value.trim();
+  if (!backendUrl) {
+    showStatus(statusEl, "Enter the intake service's URL first.", "error");
+    return;
+  }
+  hideStatus(statusEl);
+  showStatus(statusEl, "Checking…", "info");
+  try {
+    const config = await fetchAuthConfig(backendUrl);
+    await setSettings({
+      backendUrl,
+      authDisabled: Boolean(config.auth_disabled),
+      entraTenantId: config.entra_tenant_id || "",
+      entraClientId: config.entra_client_id || "",
+      entraAuthority: config.entra_authority || "https://login.microsoftonline.com",
+    });
+    hideStatus(statusEl);
+    if (config.auth_disabled) {
+      await showApp();
+    } else {
+      showGateStep("login", backendUrl);
+    }
+  } catch (err) {
+    showStatus(statusEl, `Couldn't reach that service: ${err.message}`, "error");
+  }
+}
+
+async function handleGateSignIn() {
+  const statusEl = $("gate-login-status");
+  showStatus(statusEl, "Opening Microsoft sign-in…", "info");
+  try {
+    const settings = await getSettings();
+    await signInWithEntra(entraConfigFrom(settings));
+    hideStatus(statusEl);
+    await showApp();
+  } catch (err) {
+    showStatus(statusEl, `Sign-in failed: ${err.message}`, "error");
+  }
+}
+
+async function handleGateChangeService() {
+  await clearService();
+  $("gate-backend-url").value = "";
+  hideStatus($("gate-url-status"));
+  hideStatus($("gate-login-status"));
+  showGateStep("url");
+}
+
+async function refreshConnectBadge() {
+  const settings = await getSettings();
+  const status = $("connect-status");
+  const dot = $("connect-dot");
+  const label = $("connect-label");
+  status.classList.remove("hidden");
+
+  if (!isConnected(settings)) {
+    dot.className = "dot dot-off";
+    label.textContent = "Not connected";
+    return;
+  }
+  try {
+    await pingBackend();
+    dot.className = "dot dot-on";
+    label.textContent = settings.authDisabled ? "Connected (no login)" : "Connected";
+  } catch (err) {
+    dot.className = "dot dot-off";
+    label.textContent = "Unreachable";
+  }
+}
+
+async function refreshSettingsPanel() {
+  const settings = await getSettings();
+  $("settings-backend-url-display").textContent = settings.backendUrl;
+  $("settings-auth-mode").textContent = settings.authDisabled
+    ? "This service runs with auth disabled — every filer is treated as one dev user."
+    : "Signed in with Microsoft Entra ID.";
+  $("btn-sign-out").classList.toggle("hidden", settings.authDisabled);
+}
+
+async function handleSignOut() {
+  await clearAuth();
+  hideStatus($("settings-status"));
+  await resolveConnection();
+}
+
+async function handleChangeServiceFromSettings() {
+  await clearService();
+  await resolveConnection();
+}
+
+// ---------------------------------------------------------------------
+// Tabs
+// ---------------------------------------------------------------------
+
 function switchTab(name) {
   document.querySelectorAll(".tab").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.tab === name);
@@ -24,26 +186,12 @@ function switchTab(name) {
   });
   if (name === "queue") refreshQueue();
   if (name === "history") refreshHistory();
+  if (name === "settings") refreshSettingsPanel();
 }
 
-async function refreshConnectBadge() {
-  const { backendUrl, authToken } = await getSettings();
-  const dot = $("connect-dot");
-  const label = $("connect-label");
-  if (!backendUrl) {
-    dot.className = "dot dot-off";
-    label.textContent = "Not configured";
-    return;
-  }
-  try {
-    await pingBackend();
-    dot.className = "dot dot-on";
-    label.textContent = authToken ? "Connected" : "Connected (no token)";
-  } catch (err) {
-    dot.className = "dot dot-off";
-    label.textContent = "Unreachable";
-  }
-}
+// ---------------------------------------------------------------------
+// Capture
+// ---------------------------------------------------------------------
 
 async function dataUrlToBlob(dataUrl) {
   const res = await fetch(dataUrl);
@@ -110,6 +258,10 @@ async function handleSubmitClick() {
     submitBtn.disabled = false;
   }
 }
+
+// ---------------------------------------------------------------------
+// Queue / History / Detail
+// ---------------------------------------------------------------------
 
 function displayStatus(item) {
   // `resolution` (fixed/unsolved) is the terminal state once the fixing
@@ -275,51 +427,9 @@ async function refreshHistory() {
   }
 }
 
-async function loadSettingsIntoForm() {
-  const settings = await getSettings();
-  $("backend-url").value = settings.backendUrl;
-  $("auth-token").value = settings.authToken;
-}
-
-async function handleSaveSettings() {
-  const statusEl = $("settings-status");
-  await setSettings({
-    backendUrl: $("backend-url").value.trim(),
-    authToken: $("auth-token").value.trim(),
-  });
-  showStatus(statusEl, "Saved.", "ok");
-  refreshConnectBadge();
-}
-
-async function handleConnectClick() {
-  const statusEl = $("settings-status");
-  const backendUrl = $("backend-url").value.trim();
-  if (!backendUrl) {
-    showStatus(statusEl, "Set the intake service URL first.", "error");
-    return;
-  }
-  await setSettings({ backendUrl });
-  showStatus(
-    statusEl,
-    "This build doesn't drive a full OAuth flow. Against a local instance running " +
-      "with AUTH_DISABLED=true, leave Access token blank and just Save. Against a " +
-      "real deployment, paste an Entra ID access token into Access token, then Save.",
-    "info"
-  );
-}
-
-async function handleTestConnection() {
-  const statusEl = $("settings-status");
-  showStatus(statusEl, "Testing…", "info");
-  await handleSaveSettings();
-  try {
-    await pingBackend();
-    showStatus(statusEl, "Connected.", "ok");
-  } catch (err) {
-    showStatus(statusEl, `Connection failed: ${err.message}`, "error");
-  }
-  refreshConnectBadge();
-}
+// ---------------------------------------------------------------------
+// Wiring
+// ---------------------------------------------------------------------
 
 function wireUp() {
   document.querySelectorAll(".tab").forEach((btn) => {
@@ -330,15 +440,18 @@ function wireUp() {
   $("btn-submit").addEventListener("click", handleSubmitClick);
   $("btn-refresh-queue").addEventListener("click", refreshQueue);
   $("btn-refresh-history").addEventListener("click", refreshHistory);
-  $("btn-save-settings").addEventListener("click", handleSaveSettings);
-  $("btn-connect").addEventListener("click", handleConnectClick);
-  $("btn-test-connection").addEventListener("click", handleTestConnection);
   $("btn-detail-back").addEventListener("click", closeDetail);
   $("btn-detail-answer-submit").addEventListener("click", handleDetailAnswerSubmit);
+
+  $("btn-gate-continue").addEventListener("click", handleGateContinue);
+  $("btn-gate-signin").addEventListener("click", handleGateSignIn);
+  $("btn-gate-change-service").addEventListener("click", handleGateChangeService);
+
+  $("btn-sign-out").addEventListener("click", handleSignOut);
+  $("btn-change-service").addEventListener("click", handleChangeServiceFromSettings);
 }
 
 (async function init() {
   wireUp();
-  await loadSettingsIntoForm();
-  await refreshConnectBadge();
+  await resolveConnection();
 })();

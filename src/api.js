@@ -1,28 +1,52 @@
 // Thin wrapper around the configured intake service's API. Every call reads
 // the backend URL + token from settings — nothing here is a constant.
 
-async function apiRequest(path, options = {}) {
-  const { backendUrl, authToken } = await getSettings();
+async function rawFetch(path, options, token) {
+  const { backendUrl } = await getSettings();
   if (!backendUrl) {
-    throw new Error("No intake service URL configured. Set one in Settings.");
+    throw new Error("No intake service configured. Set one up first.");
   }
-  const headers = options.headers || {};
-  if (authToken) {
-    headers["Authorization"] = `Bearer ${authToken}`;
+  const headers = { ...(options.headers || {}) };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return fetch(`${normalizeBackendUrl(backendUrl)}${path}`, { ...options, headers });
+}
+
+// Sends the request with the current token; on a 401 (expired/rejected
+// token) tries one silent refresh via the stored Entra refresh token and
+// retries once before giving up. Callers never see the intermediate 401.
+async function authorizedFetch(path, options = {}) {
+  const settings = await getSettings();
+  if (settings.authDisabled) {
+    return rawFetch(path, options, null);
   }
-  const res = await fetch(`${normalizeBackendUrl(backendUrl)}${path}`, {
-    ...options,
-    headers,
-  });
+
+  const res = await rawFetch(path, options, settings.authToken);
+  if (res.status !== 401 || !settings.authRefreshToken) {
+    return res;
+  }
+
+  try {
+    await refreshEntraToken(entraConfigFrom(settings), settings.authRefreshToken);
+  } catch (_) {
+    return res; // refresh failed — surface the original 401, popup shows sign-in again
+  }
+  const refreshed = await getSettings();
+  return rawFetch(path, options, refreshed.authToken);
+}
+
+async function parseErrorDetail(res) {
+  try {
+    const body = await res.json();
+    return body.detail || JSON.stringify(body);
+  } catch (_) {
+    return res.statusText;
+  }
+}
+
+async function apiRequest(path, options = {}) {
+  const res = await authorizedFetch(path, options);
   if (!res.ok) {
-    let detail = res.statusText;
-    try {
-      const body = await res.json();
-      detail = body.detail || JSON.stringify(body);
-    } catch (_) {
-      // no JSON body, keep statusText
-    }
-    throw new Error(`${res.status} ${detail}`);
+    throw new Error(`${res.status} ${await parseErrorDetail(res)}`);
   }
   if (res.status === 204) return null;
   return res.json();
@@ -35,27 +59,9 @@ async function submitCapture({ blob, description, pageUrl, pageTitle }) {
   form.append("page_url", pageUrl);
   form.append("page_title", pageTitle);
 
-  const { backendUrl, authToken } = await getSettings();
-  if (!backendUrl) {
-    throw new Error("No intake service URL configured. Set one in Settings.");
-  }
-  const headers = {};
-  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
-
-  const res = await fetch(`${normalizeBackendUrl(backendUrl)}/capture`, {
-    method: "POST",
-    headers,
-    body: form,
-  });
+  const res = await authorizedFetch("/capture", { method: "POST", body: form });
   if (!res.ok) {
-    let detail = res.statusText;
-    try {
-      const body = await res.json();
-      detail = body.detail || JSON.stringify(body);
-    } catch (_) {
-      // ignore
-    }
-    throw new Error(`${res.status} ${detail}`);
+    throw new Error(`${res.status} ${await parseErrorDetail(res)}`);
   }
   return res.json();
 }

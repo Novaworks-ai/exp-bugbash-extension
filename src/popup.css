@@ -80,6 +80,29 @@ body {
   background: #7dffb0;
 }
 
+.gate {
+  padding: 16px 14px;
+}
+
+.gate-step .field-label:first-child {
+  margin-top: 0;
+}
+
+.gate-step .primary-btn {
+  margin-top: 10px;
+}
+
+.gate-step .link-btn {
+  display: block;
+  margin: 10px auto 0;
+  text-align: center;
+}
+
+#gate-service-label {
+  margin: 0 0 10px;
+  word-break: break-all;
+}
+
 .tabs {
   display: flex;
   border-bottom: 1px solid var(--border);

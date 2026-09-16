@@ -7,34 +7,72 @@ to any one consuming repo.
 
 A working extension exists under [`src/`](src/) — Capture / Queue / History / Settings tabs,
 `chrome.tabs.captureVisibleTab()` capture, submit to a configured intake service, an in-popup
-clarification answer flow, and a background poll that raises a notification once an item is marked
-fixed/unsolved. Everything past this section is the original design spec this build started from —
-still accurate as the target shape, kept as-is rather than rewritten now.
+clarification answer flow, a real Sign in with Microsoft flow, and a background poll that notifies
+on two kinds of change: a new clarification question, and an item marked fixed/unsolved. Everything
+past this section is the original design spec this build started from — still accurate as the
+target shape, kept as-is rather than rewritten now.
+
+### First-run onboarding (no pasted tokens)
+
+Opening the popup for the first time shows a two-step gate, not the Capture/Queue/History tabs —
+someone with no idea what a "tenant ID" or "access token" is (a PM, a marketer, anyone just trying
+the bug bash) only ever has to do two things:
+
+1. **Paste the intake service's URL.** The extension calls that service's own `GET /auth/config` to
+   discover whether it needs auth at all, and if so, its Entra ID tenant/client ID — nothing here is
+   typed by the filer.
+2. **Click "Sign in with Microsoft"** (skipped entirely if the service reports `auth_disabled`). This
+   opens a real Microsoft sign-in window via `chrome.identity.launchWebAuthFlow` — an OAuth2
+   authorization-code + PKCE flow, no client secret, no manually-obtained token. The resulting access
+   token (and a refresh token, if the tenant grants one) live in extension storage; the background
+   poll and popup silently refresh it before it expires, only falling back to another interactive
+   sign-in if the refresh itself is rejected.
+
+**Settings** (once connected) only shows the connected service, a **Sign out**, and a
+**Change service** button — signing out or changing service just re-opens this same gate.
+
+### Entra ID app registration requirements
+
+For the Sign in with Microsoft step to work, the intake service's own Entra ID app registration
+needs, one time, from whoever administers it:
+
+- A **"Mobile and desktop applications"** platform redirect URI equal to
+  `https://<extension-id>.chromiumapp.org/` (the value `chrome.identity.getRedirectURL()` returns —
+  visible on `chrome://extensions` once this extension is loaded, as its ID). This is Chrome's
+  documented redirect target for `launchWebAuthFlow`, not a URL this project can host.
+- The app registration's own delegated permission (`<client-id>/.default`) grantable to a signed-in
+  user, and `offline_access` allowed, so the extension can silently refresh instead of forcing a
+  fresh interactive login roughly every hour.
+- No client secret is used or needed — this is a public-client PKCE flow, matching what a browser
+  extension is allowed to do safely.
 
 ### Running it locally
 
 1. Start [`exp-bugbash-intake-py`](https://github.com/Novaworks-ai/exp-bugbash-intake-py) locally
    (see its own README) — for local trial, run it with `AUTH_DISABLED=true` so every request is
-   treated as one dev filer and no token is needed.
+   treated as one dev filer and the Sign in step is skipped entirely.
 2. Load this extension unpacked: `chrome://extensions` → enable Developer mode → **Load unpacked**
    → select this repo's root directory (the one containing `manifest.json`).
-3. Open the extension popup → **Settings** tab → set **Intake service URL** to
-   `http://localhost:8000` (or whatever port you ran the backend on) → **Save**. Leave **Access
-   token** blank against an `AUTH_DISABLED=true` backend.
+3. Open the extension popup → paste `http://localhost:8000` (or whatever port you ran the backend
+   on) → **Continue**. Against `AUTH_DISABLED=true` this drops straight into the Capture tab.
 4. **Capture** tab → **Capture this page** → add a description → **Submit**.
 5. **Queue** tab shows it; if the critique engine has an open question, clicking the item opens an
-   in-popup detail view with an answer box — answering re-runs critique/routing immediately.
+   in-popup detail view with an answer box — answering re-runs critique/routing immediately. A new
+   question also raises a notification within a minute even with the popup closed; clicking it jumps
+   straight to that item's detail view.
 6. Mark an item resolved directly against the backend to see the fix-ready notification, e.g.:
    `curl -X PATCH http://localhost:8000/captures/<id>/resolution -H "Content-Type: application/json" -d '{"resolution":"fixed"}'`
    — the background poll picks it up within a minute (or click **Refresh** on the **History** tab).
 
+To exercise the real Entra ID path locally, run the backend with `AUTH_DISABLED=false` plus real
+`ENTRA_TENANT_ID`/`ENTRA_CLIENT_ID` values and a real app registration configured as above.
+
 ### Known gaps in this first cut
 
-- **Auth** is a plain bearer token pasted into Settings, not a real in-extension Entra ID OAuth
-  Connect flow — fine for local trial against an `AUTH_DISABLED=true` backend or a manually-obtained
-  token, not yet what a real multi-tester bug bash needs.
 - No offline queueing (matches the non-goal below) and no retry — a failed submit must be redone by
   hand.
+- The background poll's new-question notification doesn't distinguish "asked while I was away" from
+  "asked seconds ago" — both fire the same way once the 1-minute alarm ticks past it.
 
 Everything below this point is the original pre-build spec, kept as the design record.
 
