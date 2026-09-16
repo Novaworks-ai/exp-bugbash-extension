@@ -34,6 +34,13 @@ function showGateStep(name, serviceUrl) {
 
 const PENDING_CAPTURE_KEY = "pendingCaptureId"; // set by background.js on notification click
 
+// A native chrome.permissions.request() dialog steals focus, which closes
+// this popup (and tears down whatever async function was running) before it
+// can save anything. Persisting the typed URL here first means reopening the
+// popup can resume the connect flow automatically instead of asking the
+// filer to type the same URL again.
+const PENDING_BACKEND_URL_KEY = "pendingBackendUrl";
+
 async function showApp() {
   $("gate").classList.add("hidden");
   $("app-shell").classList.remove("hidden");
@@ -54,6 +61,18 @@ async function resolveConnection() {
   const settings = await getSettings();
 
   if (!settings.backendUrl) {
+    const stored = await chrome.storage.local.get(PENDING_BACKEND_URL_KEY);
+    const pendingUrl = stored[PENDING_BACKEND_URL_KEY];
+    if (pendingUrl) {
+      $("gate-backend-url").value = pendingUrl;
+      if (await hasOriginPermission(pendingUrl)) {
+        // Permission was already granted before this popup got torn down by
+        // the native prompt last time -- resume instead of asking again.
+        showGateStep("url");
+        await completeConnect(pendingUrl, $("gate-url-status"));
+        return;
+      }
+    }
     showGateStep("url");
     return;
   }
@@ -89,6 +108,20 @@ async function handleGateContinue() {
     return;
   }
   hideStatus(statusEl);
+
+  // Save before requesting permission -- see PENDING_BACKEND_URL_KEY.
+  await chrome.storage.local.set({ [PENDING_BACKEND_URL_KEY]: backendUrl });
+
+  const granted = await requestOriginPermission(backendUrl);
+  if (!granted) {
+    showStatus(statusEl, "Permission to contact that service is required to continue.", "error");
+    return;
+  }
+
+  await completeConnect(backendUrl, statusEl);
+}
+
+async function completeConnect(backendUrl, statusEl) {
   showStatus(statusEl, "Checking…", "info");
   try {
     const config = await fetchAuthConfig(backendUrl);
@@ -99,6 +132,7 @@ async function handleGateContinue() {
       entraClientId: config.entra_client_id || "",
       entraAuthority: config.entra_authority || "https://login.microsoftonline.com",
     });
+    await chrome.storage.local.remove(PENDING_BACKEND_URL_KEY);
     hideStatus(statusEl);
     if (config.auth_disabled) {
       await showApp();
@@ -112,9 +146,16 @@ async function handleGateContinue() {
 
 async function handleGateSignIn() {
   const statusEl = $("gate-login-status");
+  const settings = await getSettings();
+
+  const granted = await requestOriginPermission(settings.entraAuthority);
+  if (!granted) {
+    showStatus(statusEl, "Permission to contact Microsoft's sign-in service is required to continue.", "error");
+    return;
+  }
+
   showStatus(statusEl, "Opening Microsoft sign-in…", "info");
   try {
-    const settings = await getSettings();
     await signInWithEntra(entraConfigFrom(settings));
     hideStatus(statusEl);
     await showApp();
@@ -125,6 +166,7 @@ async function handleGateSignIn() {
 
 async function handleGateChangeService() {
   await clearService();
+  await chrome.storage.local.remove(PENDING_BACKEND_URL_KEY);
   $("gate-backend-url").value = "";
   hideStatus($("gate-url-status"));
   hideStatus($("gate-login-status"));
@@ -170,6 +212,7 @@ async function handleSignOut() {
 
 async function handleChangeServiceFromSettings() {
   await clearService();
+  await chrome.storage.local.remove(PENDING_BACKEND_URL_KEY);
   await resolveConnection();
 }
 

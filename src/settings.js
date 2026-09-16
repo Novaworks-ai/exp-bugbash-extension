@@ -42,6 +42,37 @@ function normalizeBackendUrl(url) {
   return url.replace(/\/+$/, "");
 }
 
+// The extension declares no required host_permissions — only
+// optional_host_permissions (see manifest.json) — so it can be reviewed
+// without "access your data on all sites." Instead it requests just the
+// specific origin it actually needs (the configured backend, and the Entra
+// ID authority it signs in against) at the moment it learns that origin,
+// via chrome.permissions.request. Once granted, that stays granted across
+// restarts — the background poll never needs to re-request it.
+function originPatternFor(url) {
+  const parsed = new URL(normalizeBackendUrl(url));
+  return `${parsed.protocol}//${parsed.hostname}${parsed.port ? ":" + parsed.port : ""}/*`;
+}
+
+async function hasOriginPermission(url) {
+  try {
+    return await chrome.permissions.contains({ origins: [originPatternFor(url)] });
+  } catch (_) {
+    return false;
+  }
+}
+
+// Must be called synchronously (no prior await) from within a user-gesture
+// handler (a click) — chrome.permissions.request requires one and Chrome
+// can silently refuse it otherwise.
+async function requestOriginPermission(url) {
+  try {
+    return await chrome.permissions.request({ origins: [originPatternFor(url)] });
+  } catch (_) {
+    return false;
+  }
+}
+
 // A token is only trustworthy for a little longer than "not yet expired" —
 // leave a margin so an in-flight request doesn't get a token that expires
 // mid-air.
