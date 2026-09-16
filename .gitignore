@@ -1,0 +1,5 @@
+node_modules/
+.DS_Store
+
+# Contains a real BUGBASH_AGENT_TOKEN bearer secret -- never commit.
+.mcp.json

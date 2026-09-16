@@ -48,18 +48,32 @@
 
     <main class="panels">
       <section class="panel active" id="panel-capture">
+        <input type="file" id="screenshot-upload-input" accept="image/*" multiple class="hidden" />
+
         <div id="capture-idle">
-          <button class="primary-btn" id="btn-capture">Capture this page</button>
+          <div class="row">
+            <button class="primary-btn" id="btn-capture">Capture this page</button>
+            <button class="secondary-btn" id="btn-upload-screenshot-idle">Upload a screenshot…</button>
+          </div>
           <p class="hint">Grabs a screenshot of the visible tab, then add a description.</p>
         </div>
 
-        <div id="capture-preview" class="hidden">
-          <img id="preview-img" alt="Screenshot preview" />
-          <label class="field-label" for="description">What's wrong?</label>
-          <textarea id="description" rows="4" placeholder="Describe the bug you saw..."></textarea>
-          <div class="page-meta" id="page-meta"></div>
-          <div class="row">
-            <button class="secondary-btn" id="btn-retake">Retake</button>
+        <div id="capture-preview" class="hidden capture-grid">
+          <div class="capture-col-media">
+            <img id="preview-img" alt="Screenshot preview" />
+            <div class="page-meta" id="page-meta"></div>
+            <div class="row">
+              <button class="secondary-btn" id="btn-retake">Retake</button>
+              <button class="secondary-btn" id="btn-add-screenshot">+ Add screenshot</button>
+              <button class="secondary-btn" id="btn-upload-screenshot">Upload…</button>
+            </div>
+            <ul class="screenshot-thumbs" id="screenshot-thumbs"></ul>
+          </div>
+          <div class="capture-col-form">
+            <label class="field-label" for="repro-steps">Steps to reproduce</label>
+            <textarea id="repro-steps" rows="4" placeholder="1. Click X...&#10;2. Navigate to Y..."></textarea>
+            <label class="field-label" for="additional-info">Additional information</label>
+            <textarea id="additional-info" rows="4" placeholder="What did you expect to happen instead? Anything else worth noting?"></textarea>
             <button class="primary-btn" id="btn-submit">Submit</button>
           </div>
         </div>
@@ -73,7 +87,7 @@
           <button class="link-btn" id="btn-refresh-queue">Refresh</button>
         </div>
         <ul class="item-list" id="queue-list"></ul>
-        <p class="empty-hint hidden" id="queue-empty">Nothing open. Submit a capture to get started.</p>
+        <p class="empty-hint hidden" id="queue-empty">Capture a report to see something here.</p>
       </section>
 
       <section class="panel" id="panel-history">
@@ -90,6 +104,7 @@
         <div class="detail-desc" id="detail-description"></div>
         <div class="page-meta" id="detail-meta"></div>
         <div class="detail-status" id="detail-status-row"></div>
+        <p class="hint hidden" id="detail-complexity"></p>
 
         <div id="detail-resolution" class="status hidden"></div>
 
@@ -114,6 +129,19 @@
           <button class="secondary-btn" id="btn-change-service">Change service</button>
         </div>
         <div class="status hidden" id="settings-status"></div>
+
+        <div class="divider"></div>
+
+        <label class="field-label" for="settings-target-app-url">Target app (for log correlation)</label>
+        <input type="text" id="settings-target-app-url" placeholder="https://your-app-under-test.example.com" />
+        <p class="hint">
+          Adds a trace-id header to requests on this site, so the intake service can correlate its
+          own logs with what you were doing. Optional — leave blank to skip.
+        </p>
+        <div class="row">
+          <button class="secondary-btn" id="btn-save-target-app">Save</button>
+        </div>
+        <div class="status hidden" id="settings-target-app-status"></div>
       </section>
     </main>
   </div>

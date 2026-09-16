@@ -1,4 +1,4 @@
-let currentScreenshot = null; // { dataUrl, blob }
+let currentScreenshots = []; // [{ dataUrl, blob }, ...] -- [0] is shown in the main preview
 let currentPage = null; // { url, title }
 
 function $(id) {
@@ -40,6 +40,10 @@ const PENDING_CAPTURE_KEY = "pendingCaptureId"; // set by background.js on notif
 // popup can resume the connect flow automatically instead of asking the
 // filer to type the same URL again.
 const PENDING_BACKEND_URL_KEY = "pendingBackendUrl";
+
+// Same focus-stealing dialog problem as PENDING_BACKEND_URL_KEY, for the
+// Settings > target app Save button.
+const PENDING_TARGET_APP_URL_KEY = "pendingTargetAppUrl";
 
 async function showApp() {
   $("gate").classList.add("hidden");
@@ -202,6 +206,23 @@ async function refreshSettingsPanel() {
     ? "This service runs with auth disabled — every filer is treated as one dev user."
     : "Signed in with Microsoft Entra ID.";
   $("btn-sign-out").classList.toggle("hidden", settings.authDisabled);
+  $("settings-target-app-url").value = settings.targetAppUrl || "";
+
+  const stored = await chrome.storage.local.get(PENDING_TARGET_APP_URL_KEY);
+  const pendingUrl = stored[PENDING_TARGET_APP_URL_KEY];
+  if (pendingUrl && (await hasOriginPermission(pendingUrl))) {
+    // Permission was already granted before the native prompt tore down the
+    // popup last time (see PENDING_TARGET_APP_URL_KEY) -- finish the save
+    // instead of leaving it looking like nothing happened.
+    $("settings-target-app-url").value = pendingUrl;
+    await setSettings({ targetAppUrl: pendingUrl });
+    await chrome.storage.local.remove(PENDING_TARGET_APP_URL_KEY);
+    showStatus(
+      $("settings-target-app-status"),
+      "Saved — a trace header will be added to requests on that site.",
+      "ok"
+    );
+  }
 }
 
 async function handleSignOut() {
@@ -214,6 +235,32 @@ async function handleChangeServiceFromSettings() {
   await clearService();
   await chrome.storage.local.remove(PENDING_BACKEND_URL_KEY);
   await resolveConnection();
+}
+
+async function handleSaveTargetApp() {
+  const statusEl = $("settings-target-app-status");
+  const url = $("settings-target-app-url").value.trim();
+  hideStatus(statusEl);
+
+  if (!url) {
+    await chrome.storage.local.remove(PENDING_TARGET_APP_URL_KEY);
+    await setSettings({ targetAppUrl: "" });
+    showStatus(statusEl, "Cleared — no trace header will be injected.", "info");
+    return;
+  }
+
+  // Save before requesting permission -- see PENDING_TARGET_APP_URL_KEY.
+  await chrome.storage.local.set({ [PENDING_TARGET_APP_URL_KEY]: url });
+
+  const granted = await requestOriginPermission(url);
+  if (!granted) {
+    showStatus(statusEl, "Permission is required to add the trace header on that site.", "error");
+    return;
+  }
+
+  await setSettings({ targetAppUrl: url });
+  await chrome.storage.local.remove(PENDING_TARGET_APP_URL_KEY);
+  showStatus(statusEl, "Saved — a trace header will be added to requests on that site.", "ok");
 }
 
 // ---------------------------------------------------------------------
@@ -246,15 +293,43 @@ async function takeScreenshot() {
   if (!tab) throw new Error("No active tab found.");
   const dataUrl = await chrome.tabs.captureVisibleTab(undefined, { format: "png" });
   currentPage = { url: tab.url || "", title: tab.title || "" };
-  currentScreenshot = { dataUrl, blob: await dataUrlToBlob(dataUrl) };
+  return { dataUrl, blob: await dataUrlToBlob(dataUrl) };
+}
+
+function renderScreenshotThumbs() {
+  const listEl = $("screenshot-thumbs");
+  listEl.innerHTML = "";
+  // currentScreenshots[0] is shown in the big preview above (Retake replaces
+  // it); everything past that shows here as a small removable thumbnail.
+  currentScreenshots.slice(1).forEach((shot, i) => {
+    const index = i + 1;
+    const li = document.createElement("li");
+    const img = document.createElement("img");
+    img.src = shot.dataUrl;
+    img.alt = `Screenshot ${index + 1}`;
+    const remove = document.createElement("button");
+    remove.className = "thumb-remove";
+    remove.textContent = "×";
+    remove.title = "Remove this screenshot";
+    remove.addEventListener("click", () => {
+      currentScreenshots.splice(index, 1);
+      renderScreenshotThumbs();
+    });
+    li.appendChild(img);
+    li.appendChild(remove);
+    listEl.appendChild(li);
+  });
 }
 
 function resetCaptureForm() {
-  $("description").value = "";
+  $("repro-steps").value = "";
+  $("additional-info").value = "";
   $("capture-idle").classList.remove("hidden");
   $("capture-preview").classList.add("hidden");
   hideStatus($("capture-status"));
-  currentScreenshot = null;
+  $("screenshot-upload-input").value = "";
+  currentScreenshots = [];
+  renderScreenshotThumbs();
   currentPage = null;
 }
 
@@ -262,24 +337,94 @@ async function handleCaptureClick() {
   const statusEl = $("capture-status");
   hideStatus(statusEl);
   try {
-    await takeScreenshot();
-    $("preview-img").src = currentScreenshot.dataUrl;
+    const shot = await takeScreenshot();
+    currentScreenshots[0] = shot;
+    $("preview-img").src = shot.dataUrl;
     $("page-meta").textContent = `${currentPage.title} — ${currentPage.url}`;
     $("capture-idle").classList.add("hidden");
     $("capture-preview").classList.remove("hidden");
+    renderScreenshotThumbs();
   } catch (err) {
     showStatus(statusEl, `Couldn't capture the page: ${err.message}`, "error");
   }
 }
 
-async function handleSubmitClick() {
+async function handleAddScreenshotClick() {
   const statusEl = $("capture-status");
-  const description = $("description").value.trim();
-  if (!description) {
-    showStatus(statusEl, "Add a short description before submitting.", "error");
+  hideStatus(statusEl);
+  try {
+    const shot = await takeScreenshot();
+    currentScreenshots.push(shot);
+    renderScreenshotThumbs();
+  } catch (err) {
+    showStatus(statusEl, `Couldn't capture the page: ${err.message}`, "error");
+  }
+}
+
+function handleUploadScreenshotClick() {
+  $("screenshot-upload-input").click();
+}
+
+async function handleScreenshotUploadChange(event) {
+  const statusEl = $("capture-status");
+  const files = Array.from(event.target.files || []);
+  event.target.value = ""; // allow picking the same file again later
+  if (!files.length) return;
+
+  // Uploading from the idle screen (no live capture yet) starts the report
+  // from the uploaded image instead -- still record which tab it came from,
+  // same as a live capture would.
+  if (!currentScreenshots.length) {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      currentPage = { url: tab?.url || "", title: tab?.title || "" };
+    } catch (_) {
+      currentPage = { url: "", title: "" };
+    }
+  }
+
+  try {
+    for (const file of files) {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      currentScreenshots.push({ dataUrl, blob: file });
+    }
+  } catch (err) {
+    showStatus(statusEl, `Couldn't read that file: ${err.message}`, "error");
     return;
   }
-  if (!currentScreenshot) {
+
+  $("preview-img").src = currentScreenshots[0].dataUrl;
+  $("page-meta").textContent = `${currentPage.title} — ${currentPage.url}`;
+  $("capture-idle").classList.add("hidden");
+  $("capture-preview").classList.remove("hidden");
+  renderScreenshotThumbs();
+}
+
+// The intake service's API still takes one `description` string -- these two
+// fields are purely a UI split (to nudge the filer toward what the critique
+// engine actually asks a follow-up question for) and get combined here.
+function buildDescription() {
+  const repro = $("repro-steps").value.trim();
+  const additional = $("additional-info").value.trim();
+  const sections = [];
+  if (repro) sections.push(`Steps to reproduce:\n${repro}`);
+  if (additional) sections.push(`Additional information:\n${additional}`);
+  return sections.join("\n\n");
+}
+
+async function handleSubmitClick() {
+  const statusEl = $("capture-status");
+  const description = buildDescription();
+  if (!description) {
+    showStatus(statusEl, "Add steps to reproduce or additional information before submitting.", "error");
+    return;
+  }
+  if (!currentScreenshots.length) {
     showStatus(statusEl, "No screenshot captured. Try again.", "error");
     return;
   }
@@ -288,7 +433,7 @@ async function handleSubmitClick() {
   showStatus(statusEl, "Submitting…", "info");
   try {
     const result = await submitCapture({
-      blob: currentScreenshot.blob,
+      blobs: currentScreenshots.map((shot) => shot.blob),
       description,
       pageUrl: currentPage.url,
       pageTitle: currentPage.title,
@@ -320,6 +465,15 @@ function statusBadge(status) {
   return span;
 }
 
+function focusAreaTag(item) {
+  const span = document.createElement("span");
+  span.className = "tag";
+  // Not yet routed (still awaiting-clarification) or the intake service's
+  // catch-all bucket -- either way there's no specific queue name to show.
+  span.textContent = item.focus_area && item.focus_area !== "unclassified" ? item.focus_area : "unrouted";
+  return span;
+}
+
 function renderItemList(listEl, emptyEl, items) {
   listEl.innerHTML = "";
   if (!items.length) {
@@ -336,8 +490,12 @@ function renderItemList(listEl, emptyEl, items) {
     meta.className = "item-meta";
     const when = document.createElement("span");
     when.textContent = new Date(item.created_at).toLocaleString();
+    const badges = document.createElement("span");
+    badges.className = "item-badges";
+    badges.appendChild(focusAreaTag(item));
+    badges.appendChild(statusBadge(displayStatus(item)));
     meta.appendChild(when);
-    meta.appendChild(statusBadge(displayStatus(item)));
+    meta.appendChild(badges);
     li.appendChild(title);
     li.appendChild(meta);
     li.addEventListener("click", () => openDetail(item.id));
@@ -381,6 +539,16 @@ function renderDetail(item) {
     area.style.marginLeft = "6px";
     area.textContent = `focus: ${item.focus_area} (${item.lane || "unrouted"})`;
     statusRow.appendChild(area);
+  }
+
+  const complexityEl = $("detail-complexity");
+  if (item.estimated_complexity || item.blast_radius) {
+    complexityEl.classList.remove("hidden");
+    let text = `complexity: ${item.estimated_complexity || "unknown"}, blast radius: ${item.blast_radius || "unknown"}`;
+    if (item.complexity_rationale) text += ` — ${item.complexity_rationale}`;
+    complexityEl.textContent = text;
+  } else {
+    complexityEl.classList.add("hidden");
   }
 
   const resolutionEl = $("detail-resolution");
@@ -480,6 +648,10 @@ function wireUp() {
   });
   $("btn-capture").addEventListener("click", handleCaptureClick);
   $("btn-retake").addEventListener("click", handleCaptureClick);
+  $("btn-add-screenshot").addEventListener("click", handleAddScreenshotClick);
+  $("btn-upload-screenshot").addEventListener("click", handleUploadScreenshotClick);
+  $("btn-upload-screenshot-idle").addEventListener("click", handleUploadScreenshotClick);
+  $("screenshot-upload-input").addEventListener("change", handleScreenshotUploadChange);
   $("btn-submit").addEventListener("click", handleSubmitClick);
   $("btn-refresh-queue").addEventListener("click", refreshQueue);
   $("btn-refresh-history").addEventListener("click", refreshHistory);
@@ -492,9 +664,19 @@ function wireUp() {
 
   $("btn-sign-out").addEventListener("click", handleSignOut);
   $("btn-change-service").addEventListener("click", handleChangeServiceFromSettings);
+  $("btn-save-target-app").addEventListener("click", handleSaveTargetApp);
+}
+
+async function clearResolvedBadge() {
+  // Opening the popup is the filer acknowledging whatever the toolbar badge
+  // was flagging -- see UNREAD_RESOLVED_KEY in background.js.
+  await chrome.storage.local.set({ unreadResolvedIds: [] });
+  await chrome.action.setBadgeText({ text: "" });
 }
 
 (async function init() {
+  $("version-badge").textContent = `v${chrome.runtime.getManifest().version}`;
   wireUp();
+  await clearResolvedBadge();
   await resolveConnection();
 })();

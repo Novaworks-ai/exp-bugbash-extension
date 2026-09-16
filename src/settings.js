@@ -15,7 +15,26 @@ const DEFAULTS = {
   authToken: "",
   authTokenExpiresAt: 0, // ms epoch
   authRefreshToken: "",
+
+  // Optional: the app under test's own URL, separate from the intake
+  // service. Set only if the filer wants log correlation -- see
+  // background.js's applyTraceHeaderRule(). Requires its own permission
+  // grant, same runtime request pattern as backendUrl.
+  targetAppUrl: "",
+  // Generated once per install (see getOrCreateTraceId), sent as trace_id on
+  // every submitted capture whenever targetAppUrl is set -- the same value
+  // background.js injects as the X-Bugbash-Trace-Id header on requests to
+  // that site, so the intake service can grep its logs for it.
+  traceId: "",
 };
+
+async function getOrCreateTraceId() {
+  const { traceId } = await getSettings();
+  if (traceId) return traceId;
+  const newId = crypto.randomUUID();
+  await setSettings({ traceId: newId });
+  return newId;
+}
 
 async function getSettings() {
   const stored = await chrome.storage.local.get(Object.keys(DEFAULTS));
@@ -34,8 +53,22 @@ async function clearAuth() {
   });
 }
 
+// Deliberately excludes targetAppUrl/traceId -- those describe the app under
+// test, independent of which intake service is configured, so switching
+// intake services shouldn't silently drop trace-header injection.
+const SERVICE_KEYS = [
+  "backendUrl",
+  "authDisabled",
+  "entraTenantId",
+  "entraClientId",
+  "entraAuthority",
+  "authToken",
+  "authTokenExpiresAt",
+  "authRefreshToken",
+];
+
 async function clearService() {
-  await chrome.storage.local.remove(Object.keys(DEFAULTS));
+  await chrome.storage.local.remove(SERVICE_KEYS);
 }
 
 function normalizeBackendUrl(url) {

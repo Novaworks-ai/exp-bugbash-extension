@@ -52,12 +52,20 @@ async function apiRequest(path, options = {}) {
   return res.json();
 }
 
-async function submitCapture({ blob, description, pageUrl, pageTitle }) {
+async function submitCapture({ blobs, description, pageUrl, pageTitle }) {
   const form = new FormData();
-  form.append("screenshot", blob, "capture.png");
+  blobs.forEach((blob, i) => form.append("screenshots", blob, `capture-${i}.png`));
   form.append("description", description);
   form.append("page_url", pageUrl);
   form.append("page_title", pageTitle);
+
+  // Only sent when a target app is actually configured -- that's the only
+  // case background.js's trace-header rule is active, so an unset traceId
+  // would just be a value nothing ever wrote into any log anyway.
+  const settings = await getSettings();
+  if (settings.targetAppUrl && settings.traceId) {
+    form.append("trace_id", settings.traceId);
+  }
 
   const res = await authorizedFetch("/capture", { method: "POST", body: form });
   if (!res.ok) {
