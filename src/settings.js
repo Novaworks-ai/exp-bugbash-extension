@@ -117,6 +117,36 @@ async function requestOriginPermission(url) {
   }
 }
 
+// Only for the captureVisibleTab activeTab-permission recovery path in
+// popup.js -- NOT a general-purpose helper, and NOT to be used for scoping
+// the backend/target-app permission (that's originPatternFor/
+// requestOriginPermission above, which stay narrow on purpose).
+//
+// chrome.tabs.captureVisibleTab specifically requires the "activeTab"
+// permission or a broad, scheme-wide host permission (e.g. "https://*/*");
+// unlike most chrome.tabs/chrome.scripting APIs, it does NOT accept a
+// narrow single-hostname grant (e.g. "https://github.com/*") even though
+// chrome.permissions.request/contains happily grant and report one. So
+// requesting the per-origin pattern here would show a permission dialog
+// that succeeds but still leaves the subsequent captureVisibleTab call
+// failing with the same "activeTab" error. Request the broad
+// "<scheme>://*/*" pattern instead -- it matches one of the
+// optional_host_permissions already declared in manifest.json
+// ("http://*/*", "https://*/*"), so this never prompts for something the
+// extension hasn't already declared it might ask for.
+function capturePermissionPatternFor(url) {
+  const parsed = new URL(url);
+  return `${parsed.protocol}//*/*`;
+}
+
+async function requestCapturePermission(url) {
+  try {
+    return await chrome.permissions.request({ origins: [capturePermissionPatternFor(url)] });
+  } catch (_) {
+    return false;
+  }
+}
+
 // A token is only trustworthy for a little longer than "not yet expired" —
 // leave a margin so an in-flight request doesn't get a token that expires
 // mid-air.

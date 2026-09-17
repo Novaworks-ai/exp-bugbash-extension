@@ -368,9 +368,17 @@ async function dataUrlToBlob(dataUrl) {
 // while it stays open leaves it holding a grant for the tab it was FIRST
 // opened on, not the one now showing. captureVisibleTab then fails with
 // "Either the '<all_urls>' or 'activeTab' permission is required." Recover
-// by requesting that one tab's origin (same per-origin pattern settings.js
-// already uses for the target-app permission) and retrying, instead of
-// asking for a blanket <all_urls> grant.
+// by requesting permission and retrying.
+//
+// This must request the broad "<scheme>://*/*" pattern (via
+// requestCapturePermission), not the narrow per-hostname pattern
+// originPatternFor/requestOriginPermission use elsewhere in settings.js:
+// captureVisibleTab specifically requires "activeTab" or a scheme-wide
+// host permission and does not accept a scoped single-hostname grant, even
+// though chrome.permissions.request/contains report one as granted. Using
+// the narrow pattern here would show a permission dialog that "succeeds"
+// but leaves the retried captureVisibleTab call failing with the exact
+// same error.
 async function takeScreenshot() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab) throw new Error("No active tab found.");
@@ -381,7 +389,7 @@ async function takeScreenshot() {
     if (!/activeTab/.test(err.message) || !tab.url) throw err;
     let granted = false;
     try {
-      granted = await requestOriginPermission(tab.url);
+      granted = await requestCapturePermission(tab.url);
     } catch (_) {
       granted = false;
     }
