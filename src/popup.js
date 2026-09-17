@@ -698,7 +698,11 @@ function renderDetail(item) {
 
   const statusRow = $("detail-status-row");
   statusRow.innerHTML = "";
-  statusRow.appendChild(statusBadge(item.status));
+  // Use the same resolution-aware status as the Queue/History lists
+  // (displayStatus prefers `resolution` over `status`) -- otherwise a
+  // resolved item shows a stale "ready"/"awaiting-clarification" badge here
+  // while the list already shows its terminal resolution (e.g. "duplicate").
+  statusRow.appendChild(statusBadge(displayStatus(item)));
   if (item.focus_area) {
     const area = document.createElement("span");
     area.className = "hint";
