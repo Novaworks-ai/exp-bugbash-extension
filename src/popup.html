@@ -56,11 +56,15 @@
             <span>Test scope</span>
             <button class="link-btn" id="btn-dismiss-focus-areas">Dismiss</button>
           </div>
-          <!-- Optional BUG_BASH_INFO / BUG_BASH_INFO_URL (from GET
-               /focus_areas) -- hidden entirely when the deployment sets
-               neither. See refreshFocusAreas / renderBugBashInfo. -->
+          <!-- Optional BUG_BASH_INFO (from GET /focus_areas) -- plain text,
+               never a link. Hidden entirely when the deployment doesn't set
+               it. See refreshFocusAreas / renderBugBashInfo. -->
           <p class="hint hidden" id="focus-areas-info"></p>
+          <p class="field-label" id="focus-areas-heading">Focus areas</p>
           <p class="hint" id="focus-areas-list"></p>
+          <!-- Optional BUG_BASH_INFO_URL, shown as a single "Additional
+               information" link at the bottom -- hidden when unset. -->
+          <p class="hint hidden" id="focus-areas-info-link"></p>
         </div>
 
         <div id="capture-idle">

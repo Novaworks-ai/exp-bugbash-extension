@@ -396,9 +396,14 @@ textarea:focus {
   margin: 4px 0 0;
 }
 
-/* Clickable focus-area labels / the optional top BUG_BASH_INFO(_URL) line --
+#focus-areas-banner .field-label {
+  margin: 8px 0 2px;
+}
+
+/* The single bottom "Additional information" link (from BUG_BASH_INFO_URL) --
    kept minimal, reusing .hint's existing color/size rather than new heavy
-   styling; just enough to read as a link. */
+   styling; just enough to read as a link. Focus-area labels and
+   BUG_BASH_INFO are always plain text now. */
 #focus-areas-banner a {
   color: var(--brand-dark);
   text-decoration: underline;
