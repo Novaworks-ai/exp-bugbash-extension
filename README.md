@@ -39,10 +39,17 @@ the bug bash) only ever has to do two things:
 For the Sign in with Microsoft step to work, the intake service's own Entra ID app registration
 needs, one time, from whoever administers it:
 
-- A **"Mobile and desktop applications"** platform redirect URI equal to
+- A **"Single-page application"** platform redirect URI equal to
   `https://<extension-id>.chromiumapp.org/` (the value `chrome.identity.getRedirectURL()` returns —
   visible on `chrome://extensions` once this extension is loaded, as its ID). This is Chrome's
-  documented redirect target for `launchWebAuthFlow`, not a URL this project can host.
+  documented redirect target for `launchWebAuthFlow`, not a URL this project can host. **Must be
+  "Single-page application," not "Mobile and desktop applications"** — confirmed live: the token
+  exchange (`src/oauth.js`) is a `fetch()` POST from the extension's own JS, a genuine cross-origin
+  browser request carrying `Origin: chrome-extension://<id>`, which Microsoft's token endpoint
+  rejects for a "Mobile and desktop applications"-registered redirect URI with `AADSTS9002326:
+  Cross-origin token redemption is permitted only for the 'Single-Page Application' client-type` —
+  the interactive login itself completes fine; only the token exchange right after it fails, with no
+  other visible symptom.
 - The app registration's own delegated permission (`<client-id>/.default`) grantable to a signed-in
   user, and `offline_access` allowed, so the extension can silently refresh instead of forcing a
   fresh interactive login roughly every hour.
