@@ -328,6 +328,20 @@ function showPanel(name) {
   });
 }
 
+// Critique runs asynchronously now (exp-bugbash-intake-py's
+// app/critique_worker.py) -- a capture's status can keep changing in the
+// background for a while after it was last fetched (e.g. right after
+// answering a clarification), so the queue list can be stale by the time
+// you come back to it. Refresh on the way home, same as openHistory/
+// openSettings already do for their own panels, instead of leaving it
+// showing whatever was last fetched (real bug filed live: the list badge
+// still said "awaiting-clarification" for an item the detail view, freshly
+// fetched, already showed as "ready").
+async function goHome() {
+  showPanel("main");
+  await refreshQueue();
+}
+
 async function openHistory() {
   showPanel("history");
   await refreshHistory();
@@ -829,7 +843,7 @@ function wireUp() {
 
   // The only way back from History/Settings/Detail -- no separate Back
   // button on each; clicking the brand always returns to #panel-main.
-  $("btn-home").addEventListener("click", () => showPanel("main"));
+  $("btn-home").addEventListener("click", goHome);
   $("btn-open-history").addEventListener("click", openHistory);
   $("btn-open-settings").addEventListener("click", openSettings);
 

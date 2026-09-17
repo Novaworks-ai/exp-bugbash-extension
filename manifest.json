@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bug Bash Capture",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Capture a screenshot + description of a bug during a bug-bash session and send it to a configured intake service.",
   "action": {
     "default_popup": "src/popup.html",
