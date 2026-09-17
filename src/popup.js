@@ -1,11 +1,12 @@
 let currentScreenshots = []; // [{ dataUrl, blob }, ...] -- [0] is shown in the main preview
 let currentPage = null; // { url, title }
 let currentConsoleErrors = []; // [{ level, message, timestamp }, ...] -- see fetchConsoleErrors
-// True when currentPage was populated from an uploaded screenshot rather
-// than a live "Capture this page" -- gates the "Include this page's info"
-// checkbox (a live capture is always about the current page, so it never
-// applies there). Reset in takeScreenshot() / handleScreenshotUploadChange().
-let currentPageFromUpload = false;
+// True when currentPage wasn't necessarily populated from a live
+// "Capture this page" -- i.e. an uploaded screenshot or a text-only report --
+// which gates the "Include this page's info" checkbox (a live capture is
+// always about the current page, so it never applies there). Reset in
+// takeScreenshot() / handleScreenshotUploadChange() / handleTextOnlyClick().
+let pageMetaOptional = false;
 
 function $(id) {
   return document.getElementById(id);
@@ -417,8 +418,32 @@ async function takeScreenshot() {
     dataUrl = await chrome.tabs.captureVisibleTab(undefined, { format: "png" });
   }
   currentPage = { url: tab.url || "", title: tab.title || "" };
-  currentPageFromUpload = false;
+  pageMetaOptional = false;
   return { dataUrl, blob: await dataUrlToBlob(dataUrl), tabId: tab.id };
+}
+
+// Best-effort read of the active tab's URL/title, used to prefill
+// currentPage for the two entry points where it's optional (upload,
+// text-only) -- never throws, since a failure here just means the checkbox
+// starts blank rather than blocking the report.
+async function readActiveTabMeta() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    return { url: tab?.url || "", title: tab?.title || "" };
+  } catch (_) {
+    return { url: "", title: "" };
+  }
+}
+
+// Shows/hides the big screenshot preview (and the "Retake" button, which
+// makes no sense with nothing to retake) based on whether there's a
+// screenshot at all -- the text-only entry point reaches #capture-preview
+// with zero, and "+ Add screenshot"/"Upload…" can add one afterward.
+function syncMediaPreview() {
+  const hasScreenshot = currentScreenshots.length > 0;
+  $("preview-img").classList.toggle("hidden", !hasScreenshot);
+  $("btn-retake").classList.toggle("hidden", !hasScreenshot);
+  if (hasScreenshot) $("preview-img").src = currentScreenshots[0].dataUrl;
 }
 
 function renderScreenshotThumbs() {
@@ -455,8 +480,9 @@ function resetCaptureForm() {
   $("screenshot-upload-input").value = "";
   currentScreenshots = [];
   renderScreenshotThumbs();
+  syncMediaPreview();
   currentPage = null;
-  currentPageFromUpload = false;
+  pageMetaOptional = false;
   $("include-page-meta").checked = true;
   $("page-meta-toggle-row").classList.add("hidden");
   currentConsoleErrors = [];
@@ -464,17 +490,18 @@ function resetCaptureForm() {
 }
 
 // Whether pageUrl/pageTitle should actually be sent: always true for a live
-// capture (the whole point is the current page); for an uploaded screenshot,
-// only when the "Include this page's info" checkbox is checked.
+// capture (the whole point is the current page); for an uploaded screenshot
+// or a text-only report, only when the "Include this page's info" checkbox
+// is checked.
 function shouldIncludePageMeta() {
-  return !currentPageFromUpload || $("include-page-meta").checked;
+  return !pageMetaOptional || $("include-page-meta").checked;
 }
 
 // Keeps #page-meta's text and the checkbox's visibility in sync with
-// currentPage / currentPageFromUpload. The checkbox only makes sense (and is
-// only shown) for an uploaded screenshot -- see currentPageFromUpload.
+// currentPage / pageMetaOptional. The checkbox only makes sense (and is
+// only shown) when page info is optional -- see pageMetaOptional.
 function renderPageMeta() {
-  $("page-meta-toggle-row").classList.toggle("hidden", !currentPageFromUpload);
+  $("page-meta-toggle-row").classList.toggle("hidden", !pageMetaOptional);
   $("page-meta").textContent = shouldIncludePageMeta()
     ? `${currentPage.title} — ${currentPage.url}`
     : "";
@@ -496,7 +523,7 @@ async function handleCaptureClick() {
   try {
     const shot = await takeScreenshot();
     currentScreenshots[0] = shot;
-    $("preview-img").src = shot.dataUrl;
+    syncMediaPreview();
     renderPageMeta();
     $("capture-idle").classList.add("hidden");
     $("capture-preview").classList.remove("hidden");
@@ -519,6 +546,7 @@ async function handleAddScreenshotClick() {
     const shot = await takeScreenshot();
     currentScreenshots.push(shot);
     renderScreenshotThumbs();
+    syncMediaPreview();
   } catch (err) {
     showStatus(statusEl, `Couldn't capture the page: ${err.message}`, "error");
   }
@@ -538,13 +566,8 @@ async function handleScreenshotUploadChange(event) {
   // from the uploaded image instead -- still record which tab it came from,
   // same as a live capture would.
   if (!currentScreenshots.length) {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      currentPage = { url: tab?.url || "", title: tab?.title || "" };
-    } catch (_) {
-      currentPage = { url: "", title: "" };
-    }
-    currentPageFromUpload = true;
+    currentPage = await readActiveTabMeta();
+    pageMetaOptional = true;
     $("include-page-meta").checked = true;
   }
 
@@ -563,8 +586,25 @@ async function handleScreenshotUploadChange(event) {
     return;
   }
 
-  $("preview-img").src = currentScreenshots[0].dataUrl;
+  syncMediaPreview();
   renderPageMeta();
+  $("capture-idle").classList.add("hidden");
+  $("capture-preview").classList.remove("hidden");
+  renderScreenshotThumbs();
+}
+
+// Entry point for a report with no screenshot at all -- goes straight to
+// the description form with #preview-img hidden (see syncMediaPreview).
+// Page info is optional here too, same as an uploaded screenshot: there's
+// no image to say it's "about" the current tab, so the filer can uncheck
+// it via the same "Include this page's info" checkbox/toggle.
+async function handleTextOnlyClick() {
+  currentScreenshots = [];
+  currentPage = await readActiveTabMeta();
+  pageMetaOptional = true;
+  $("include-page-meta").checked = true;
+  renderPageMeta();
+  syncMediaPreview();
   $("capture-idle").classList.add("hidden");
   $("capture-preview").classList.remove("hidden");
   renderScreenshotThumbs();
@@ -611,10 +651,11 @@ async function handleSubmitClick() {
     showStatus(statusEl, "Add steps to reproduce or additional information before submitting.", "error");
     return;
   }
-  if (!currentScreenshots.length) {
-    showStatus(statusEl, "No screenshot captured. Try again.", "error");
-    return;
-  }
+  // A screenshot is no longer mandatory -- the backend accepts zero of them,
+  // and the only way to reach this form with none is the "text-only report"
+  // entry point (handleTextOnlyClick), which is an intentional choice, not a
+  // failed capture. The description check above still keeps a totally empty
+  // report from going out.
   const submitBtn = $("btn-submit");
   submitBtn.disabled = true;
   showStatus(statusEl, "Submitting…", "info");
@@ -1025,6 +1066,7 @@ function wireUp() {
   $("btn-add-screenshot").addEventListener("click", handleAddScreenshotClick);
   $("btn-upload-screenshot").addEventListener("click", handleUploadScreenshotClick);
   $("btn-upload-screenshot-idle").addEventListener("click", handleUploadScreenshotClick);
+  $("btn-text-only").addEventListener("click", handleTextOnlyClick);
   $("screenshot-upload-input").addEventListener("change", handleScreenshotUploadChange);
   $("include-page-meta").addEventListener("change", renderPageMeta);
   $("btn-submit").addEventListener("click", handleSubmitClick);

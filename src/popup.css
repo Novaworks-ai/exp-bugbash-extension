@@ -194,6 +194,11 @@ body.side-panel .panels {
   margin-top: 6px;
 }
 
+#btn-text-only {
+  display: block;
+  margin-top: 8px;
+}
+
 .capture-col-form textarea {
   min-height: 72px;
 }
