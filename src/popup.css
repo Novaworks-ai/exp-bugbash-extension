@@ -471,6 +471,14 @@ textarea:focus {
   color: var(--text-muted);
 }
 
+.badge-submitted {
+  /* Freshly created/answered, not yet critiqued -- app/critique_worker.py's
+     background pass picks this up shortly (claude_code critique can take
+     tens of seconds, so this is a real, if brief, transient state now). */
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
 .badge-awaiting-clarification {
   background: #fff3d6;
   color: #9a6b00;
