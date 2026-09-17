@@ -79,20 +79,64 @@ async function applyTraceHeaderRule() {
   });
 }
 
+// Console-error auto-capture: same idea as the trace header above, scoped to
+// the same granted "Target app" origin -- registers a MAIN-world content
+// script (src/console-capture.js) that buffers console.error/warn and
+// uncaught errors on that site. popup.js reads the buffer back out via a
+// one-shot chrome.scripting.executeScript call when "Capture this page" is
+// clicked. Deliberately NOT using chrome.debugger (Chrome DevTools
+// Protocol) -- that would show a persistent "this extension is debugging
+// this browser" banner and is a much heavier permission than this
+// lightweight, opt-in-per-origin approach needs.
+const CONSOLE_CAPTURE_SCRIPT_ID = "bugbash-console-capture";
+
+async function applyConsoleCaptureScript() {
+  try {
+    await chrome.scripting.unregisterContentScripts({ ids: [CONSOLE_CAPTURE_SCRIPT_ID] });
+  } catch (_) {
+    // Wasn't registered yet -- fine, this runs unconditionally on every
+    // apply so a changed/cleared target app doesn't leave a stale script
+    // registered against the old origin.
+  }
+
+  const settings = await getSettings();
+  if (!settings.targetAppUrl) return;
+
+  const granted = await hasOriginPermission(settings.targetAppUrl);
+  if (!granted) return; // permission was revoked since the URL was saved
+
+  const pattern = originPatternFor(settings.targetAppUrl);
+  await chrome.scripting.registerContentScripts([
+    {
+      id: CONSOLE_CAPTURE_SCRIPT_ID,
+      matches: [pattern],
+      js: ["console-capture.js"],
+      world: "MAIN",
+      runAt: "document_start",
+      allFrames: true,
+    },
+  ]);
+}
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && (changes.targetAppUrl || changes.traceId)) {
     applyTraceHeaderRule().catch(() => {});
+  }
+  if (area === "local" && changes.targetAppUrl) {
+    applyConsoleCaptureScript().catch(() => {});
   }
 });
 
 chrome.runtime.onStartup.addListener(() => {
   applyTraceHeaderRule().catch(() => {});
+  applyConsoleCaptureScript().catch(() => {});
   updateBadge().catch(() => {});
 });
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create(POLL_ALARM, { periodInMinutes: 1 });
   applyTraceHeaderRule().catch(() => {});
+  applyConsoleCaptureScript().catch(() => {});
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {

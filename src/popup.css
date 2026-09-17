@@ -422,6 +422,11 @@ textarea:focus {
   color: var(--ok);
 }
 
+.badge-duplicate {
+  background: #e8f8ef;
+  color: var(--ok);
+}
+
 .badge-unsolved {
   background: #fbeae9;
   color: var(--danger);

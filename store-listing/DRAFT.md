@@ -53,13 +53,21 @@ view instead of a hosted HTML page — CWS review accepts this as a valid privac
 - **identity**: to run the Sign in with Microsoft OAuth2 (PKCE) flow via
   `chrome.identity.launchWebAuthFlow` — the standard, supported way for an extension to run a
   public-client OAuth login.
-- **host_permissions (`http://*/*`, `https://*/*`)**: the intake service URL is a user-supplied
-  setting (different bug-bash deployments point at different self-hosted backends), so the exact
-  domain isn't known ahead of time. Also needed to reach Microsoft's own login/token endpoints for
-  the OAuth flow. **Known review risk**: broad host permissions draw extra CWS scrutiny/slower
-  review; if this stalls review, the fallback is switching to `optional_host_permissions` requested
-  at runtime for just the domain the user enters in Settings — not done yet, revisit if this
-  becomes the blocker.
+- **declarativeNetRequest**: to add a trace-id request header on the specific "Target app" origin
+  the user opts into in Settings (for the intake service to correlate a report with that app's own
+  logs) — scoped to that one user-granted origin, never applied broadly.
+- **scripting**: to inject a small script (also scoped to that same user-granted "Target app"
+  origin) that buffers recent console errors/warnings, so a bug report can include what the
+  browser console actually showed instead of relying on the user to notice and transcribe it by
+  hand. Deliberately not `debugger` (Chrome DevTools Protocol) — that permission is far more
+  invasive (a persistent "this extension is debugging your browser" banner) for the same outcome.
+- **optional_host_permissions (`http://*/*`, `https://*/*`)**: declared as *optional*, not
+  required — nothing is granted at install. The intake service URL and the "Target app" URL are
+  both user-supplied settings (different bug-bash deployments point at different self-hosted
+  backends), so the exact domains aren't known ahead of time. The extension requests permission for
+  just the specific origin the user enters, at the moment they enter it
+  (`chrome.permissions.request`), never for "all sites" — see `src/settings.js`'s
+  `requestOriginPermission`.
 
 ## Assets still needed before submitting
 

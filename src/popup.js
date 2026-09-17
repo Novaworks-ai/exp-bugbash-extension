@@ -1,5 +1,6 @@
 let currentScreenshots = []; // [{ dataUrl, blob }, ...] -- [0] is shown in the main preview
 let currentPage = null; // { url, title }
+let currentConsoleErrors = []; // [{ level, message, timestamp }, ...] -- see fetchConsoleErrors
 
 function $(id) {
   return document.getElementById(id);
@@ -293,7 +294,7 @@ async function takeScreenshot() {
   if (!tab) throw new Error("No active tab found.");
   const dataUrl = await chrome.tabs.captureVisibleTab(undefined, { format: "png" });
   currentPage = { url: tab.url || "", title: tab.title || "" };
-  return { dataUrl, blob: await dataUrlToBlob(dataUrl) };
+  return { dataUrl, blob: await dataUrlToBlob(dataUrl), tabId: tab.id };
 }
 
 function renderScreenshotThumbs() {
@@ -331,6 +332,18 @@ function resetCaptureForm() {
   currentScreenshots = [];
   renderScreenshotThumbs();
   currentPage = null;
+  currentConsoleErrors = [];
+  renderConsoleErrorsHint();
+}
+
+function renderConsoleErrorsHint() {
+  const el = $("console-errors-hint");
+  if (currentConsoleErrors.length) {
+    el.textContent = `${currentConsoleErrors.length} console error(s)/warning(s) auto-captured from this page.`;
+    el.classList.remove("hidden");
+  } else {
+    el.classList.add("hidden");
+  }
 }
 
 async function handleCaptureClick() {
@@ -344,6 +357,12 @@ async function handleCaptureClick() {
     $("capture-idle").classList.add("hidden");
     $("capture-preview").classList.remove("hidden");
     renderScreenshotThumbs();
+
+    // Best-effort: only returns anything if this tab's origin is the
+    // filer's configured "Target app" (Settings) -- silently empty
+    // otherwise, which is the normal case for most captures.
+    currentConsoleErrors = await fetchConsoleErrors(shot.tabId);
+    renderConsoleErrorsHint();
   } catch (err) {
     showStatus(statusEl, `Couldn't capture the page: ${err.message}`, "error");
   }
@@ -414,7 +433,29 @@ function buildDescription() {
   const sections = [];
   if (repro) sections.push(`Steps to reproduce:\n${repro}`);
   if (additional) sections.push(`Additional information:\n${additional}`);
+  if (currentConsoleErrors.length) {
+    const formatted = currentConsoleErrors.map((e) => `[${e.level}] ${e.message}`).join("\n");
+    sections.push(`Console errors (auto-captured):\n${formatted}`);
+  }
   return sections.join("\n\n");
+}
+
+// Reads back whatever src/console-capture.js has buffered on the given tab
+// -- silently returns [] if that script was never injected there (the tab
+// isn't the configured Target app origin) or permission's since been
+// revoked. Not an error case: most captures won't have a target app
+// configured at all.
+async function fetchConsoleErrors(tabId) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      world: "MAIN",
+      func: () => window.__bugbashConsoleBuffer || [],
+    });
+    return results?.[0]?.result || [];
+  } catch (_) {
+    return [];
+  }
 }
 
 async function handleSubmitClick() {
@@ -553,8 +594,17 @@ function renderDetail(item) {
 
   const resolutionEl = $("detail-resolution");
   if (item.resolution) {
-    const kind = item.resolution === "fixed" ? "ok" : "error";
-    let msg = item.resolution === "fixed" ? "Fixed — try the original action again." : "Marked unsolved.";
+    const kind = item.resolution === "fixed" || item.resolution === "duplicate" ? "ok" : "error";
+    let msg;
+    if (item.resolution === "fixed") {
+      msg = "Fixed — try the original action again.";
+    } else if (item.resolution === "duplicate") {
+      msg = item.duplicate_of
+        ? `Duplicate of an already-fixed report (${item.duplicate_of}).`
+        : "Duplicate of an already-fixed report.";
+    } else {
+      msg = "Marked unsolved.";
+    }
     if (item.resolution_note) msg += ` ${item.resolution_note}`;
     if (item.pr_url) msg += ` (${item.pr_url})`;
     showStatus(resolutionEl, msg, kind);
