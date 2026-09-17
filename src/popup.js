@@ -838,54 +838,48 @@ async function refreshQueue() {
   }
 }
 
-// Renders the optional top info line from GET /focus_areas' bug_bash_info /
-// bug_bash_info_url (both independent and optional -- either, both, or
-// neither may be set):
-//   - both set: bug_bash_info text, clickable to bug_bash_info_url
-//   - only bug_bash_info_url: the URL itself shown as the clickable text
-//   - only bug_bash_info: plain, non-clickable text
-//   - neither: element stays hidden (no change from before this existed)
-function renderBugBashInfo(info, infoUrl) {
+// Renders the optional top info line from GET /focus_areas' bug_bash_info --
+// always plain, non-clickable text now (per filer feedback: too many links).
+// bug_bash_info_url, if set, is surfaced separately at the bottom of the
+// banner as a single "Additional information" link -- see
+// renderBugBashInfoLink.
+function renderBugBashInfo(info) {
   const el = $("focus-areas-info");
-  el.innerHTML = "";
-  if (!info && !infoUrl) {
+  el.textContent = "";
+  if (!info) {
     el.classList.add("hidden");
     return;
   }
-
-  if (infoUrl) {
-    const link = document.createElement("a");
-    link.href = infoUrl;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = info || infoUrl;
-    el.appendChild(link);
-  } else {
-    el.textContent = info;
-  }
+  el.textContent = info;
   el.classList.remove("hidden");
 }
 
-// Builds the " · "-joined focus-area list as real DOM nodes rather than one
-// joined string, so an area with a `url` can render as a clickable <a>
-// while one without stays plain text -- a single textContent string can't
-// mix the two.
+// Renders the single "Additional information" link at the bottom of the
+// banner from bug_bash_info_url, if set. This is now the *only* link the
+// banner ever shows -- per-area `url`s and bug_bash_info are always plain
+// text (see renderFocusAreaList / renderBugBashInfo).
+function renderBugBashInfoLink(infoUrl) {
+  const el = $("focus-areas-info-link");
+  el.innerHTML = "";
+  if (!infoUrl) {
+    el.classList.add("hidden");
+    return;
+  }
+  const link = document.createElement("a");
+  link.href = infoUrl;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "Additional information";
+  el.appendChild(link);
+  el.classList.remove("hidden");
+}
+
+// Builds the " · "-joined focus-area list as plain text -- per filer
+// feedback, an area's `url` (if set) is no longer rendered as a link; it's
+// left in the data model but ignored here.
 function renderFocusAreaList(areas) {
   const el = $("focus-areas-list");
-  el.innerHTML = "";
-  areas.forEach((area, i) => {
-    if (i > 0) el.appendChild(document.createTextNode(" · "));
-    if (area.url) {
-      const link = document.createElement("a");
-      link.href = area.url;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.textContent = area.label;
-      el.appendChild(link);
-    } else {
-      el.appendChild(document.createTextNode(area.label));
-    }
-  });
+  el.textContent = areas.map((area) => area.label).join(" · ");
 }
 
 // Bug bash "starts with no context" otherwise -- this is the test scope
@@ -902,15 +896,19 @@ async function refreshFocusAreas() {
   try {
     const { areas, bug_bash_info, bug_bash_info_url } = await listFocusAreas();
     const visible = areas.filter((area) => area.key !== "unclassified");
-    renderBugBashInfo(bug_bash_info, bug_bash_info_url);
+    renderBugBashInfo(bug_bash_info);
+    renderBugBashInfoLink(bug_bash_info_url);
     const hasInfo = Boolean(bug_bash_info || bug_bash_info_url);
     if (visible.length === 0) {
+      $("focus-areas-heading").classList.add("hidden");
       $("focus-areas-list").innerHTML = "";
-      // Keep the banner up if there's still a top info line to show even
-      // with no (or only "unclassified") focus areas configured.
+      // Keep the banner up if there's still a top info line (or bottom
+      // link) to show even with no (or only "unclassified") focus areas
+      // configured.
       bannerEl.classList.toggle("hidden", !hasInfo);
       return;
     }
+    $("focus-areas-heading").classList.remove("hidden");
     renderFocusAreaList(visible);
     bannerEl.classList.remove("hidden");
   } catch (_) {
