@@ -66,6 +66,13 @@ async function submitCapture({ blobs, description, pageUrl, pageTitle }) {
   if (settings.targetAppUrl && settings.traceId) {
     form.append("trace_id", settings.traceId);
   }
+  // Operator-configured SN instance base URL (set once in extension settings,
+  // not tester-controlled) -- the intake service uses its origin as the
+  // isolation key (sn_origin) so one stack can serve multiple PDI instances
+  // without captures leaking across queues.
+  if (settings.targetAppUrl) {
+    form.append("target_app_url", settings.targetAppUrl);
+  }
 
   const res = await authorizedFetch("/capture", { method: "POST", body: form });
   if (!res.ok) {
