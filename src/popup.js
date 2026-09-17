@@ -811,6 +811,7 @@ async function handleDetailAnswerSubmit() {
     const updated = await answerClarification(id, answer);
     renderDetail(updated);
     showStatus(statusEl, "Answer sent.", "ok");
+    setTimeout(goHome, 1500);
   } catch (err) {
     showStatus(statusEl, `Couldn't send answer: ${err.message}`, "error");
   }
