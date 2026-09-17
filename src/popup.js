@@ -601,10 +601,18 @@ async function handleSubmitClick() {
 // ---------------------------------------------------------------------
 
 function displayStatus(item) {
-  // `resolution` (fixed/unsolved) is the terminal state once the fixing
-  // pipeline has acted; `status` (awaiting-clarification/ready) tracks the
-  // critique/routing state up to that point.
-  return item.resolution || item.status;
+  // `resolution` (fixed/unsolved/duplicate/deferred) is the terminal state
+  // once the fixing pipeline has acted; `status`
+  // (submitted/awaiting-clarification/ready/resolved) tracks the
+  // critique/routing state up to that point. Neither one on its own says
+  // whether a "ready" item has actually been picked up yet -- claim_next()
+  // sets `claimed_by` without changing `status` (still "ready"), so a
+  // claimed-but-not-yet-resolved item looked identical to an unclaimed one.
+  // `claimed` is derived here, client-side, from the fields already in the
+  // API response -- no backend/status-enum change needed.
+  if (item.resolution) return item.resolution;
+  if (item.status === "ready" && item.claimed_by) return "claimed";
+  return item.status;
 }
 
 function statusBadge(status) {

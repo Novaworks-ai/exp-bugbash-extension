@@ -500,6 +500,15 @@ textarea:focus {
   color: var(--brand-dark);
 }
 
+.badge-claimed {
+  /* Distinct from "ready" (still waiting to be picked up) -- an agent has
+     claimed this item and is actively working it, derived client-side from
+     claimed_by (see displayStatus()), not a resolution or a real status
+     value on the backend. */
+  background: #f1e6ff;
+  color: #6b3fa0;
+}
+
 .badge-fixed {
   background: #e8f8ef;
   color: var(--ok);
