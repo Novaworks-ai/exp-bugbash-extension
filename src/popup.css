@@ -385,6 +385,17 @@ textarea:focus {
   color: var(--text-muted);
 }
 
+.status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+#focus-areas-banner .hint {
+  margin: 4px 0 0;
+}
+
 .panel-toolbar {
   display: flex;
   align-items: center;

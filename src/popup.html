@@ -48,6 +48,17 @@
       <section class="panel active" id="panel-main">
         <input type="file" id="screenshot-upload-input" accept="image/*" multiple class="hidden" />
 
+        <!-- First-run context: what this bug bash is testing and where a
+             report gets routed. Fetched from GET /focus_areas on open;
+             dismissible so it doesn't nag on every subsequent visit. -->
+        <div class="status info hidden" id="focus-areas-banner">
+          <div class="status-header">
+            <span>Test scope</span>
+            <button class="link-btn" id="btn-dismiss-focus-areas">Dismiss</button>
+          </div>
+          <p class="hint" id="focus-areas-list"></p>
+        </div>
+
         <div id="capture-idle">
           <div class="row">
             <button class="primary-btn" id="btn-capture">Capture this page</button>

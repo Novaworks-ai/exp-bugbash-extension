@@ -54,6 +54,7 @@ async function showApp() {
   // Queue lives right in #panel-main now (no separate tab to click into it
   // any more), so it needs loading up front rather than on tab-switch.
   await refreshQueue();
+  await refreshFocusAreas();
   await openPendingCaptureIfAny();
 }
 
@@ -811,6 +812,38 @@ async function refreshQueue() {
   }
 }
 
+// Bug bash "starts with no context" otherwise -- this is the test scope
+// (focus areas a report may get routed into) so a first-time filer sees it
+// as soon as #panel-main opens, without hunting through Settings.
+async function refreshFocusAreas() {
+  const bannerEl = $("focus-areas-banner");
+  const { focusAreasBannerDismissed } = await getSettings();
+  if (focusAreasBannerDismissed) {
+    bannerEl.classList.add("hidden");
+    return;
+  }
+
+  try {
+    const areas = await listFocusAreas();
+    const visible = areas.filter((area) => area.key !== "unclassified");
+    if (visible.length === 0) {
+      bannerEl.classList.add("hidden");
+      return;
+    }
+    $("focus-areas-list").textContent = visible.map((area) => area.label).join(" · ");
+    bannerEl.classList.remove("hidden");
+  } catch (_) {
+    // Best-effort context only -- a failed fetch just means no banner, same
+    // as refreshQueue's presence-fetch fallback.
+    bannerEl.classList.add("hidden");
+  }
+}
+
+async function handleDismissFocusAreas() {
+  await setSettings({ focusAreasBannerDismissed: true });
+  $("focus-areas-banner").classList.add("hidden");
+}
+
 async function refreshHistory() {
   const listEl = $("history-list");
   const emptyEl = $("history-empty");
@@ -839,6 +872,7 @@ function wireUp() {
   $("btn-cancel-capture").addEventListener("click", resetCaptureForm);
   $("btn-refresh-queue").addEventListener("click", refreshQueue);
   $("btn-refresh-history").addEventListener("click", refreshHistory);
+  $("btn-dismiss-focus-areas").addEventListener("click", handleDismissFocusAreas);
   $("btn-detail-answer-submit").addEventListener("click", handleDetailAnswerSubmit);
 
   // The only way back from History/Settings/Detail -- no separate Back

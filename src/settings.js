@@ -32,6 +32,11 @@ const DEFAULTS = {
   // chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick }). Toggled
   // via the Settings tab's Pin/Unpin button.
   uiMode: "popup",
+
+  // Whether the filer has dismissed the "test scope" (focus areas) banner
+  // on #panel-main -- see popup.js's refreshFocusAreas(). Persisted so it
+  // stays dismissed across popup open/close, same as everything else here.
+  focusAreasBannerDismissed: false,
 };
 
 async function getOrCreateTraceId() {
