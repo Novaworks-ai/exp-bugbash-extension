@@ -90,6 +90,13 @@ async function pingBackend() {
   return apiRequest("/healthz");
 }
 
+// The "test scope" for this bug bash -- the configured focus areas a report
+// may get routed into (config/focus_areas.yaml on the intake service). Public
+// on the backend (same as /auth/config), so this works even before sign-in.
+async function listFocusAreas() {
+  return apiRequest("/focus_areas");
+}
+
 async function getCapture(id) {
   return apiRequest(`/captures/${encodeURIComponent(id)}`);
 }
