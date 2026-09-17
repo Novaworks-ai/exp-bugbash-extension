@@ -328,7 +328,13 @@ async function handleSaveTargetApp() {
 // alongside whatever page is being tested). History and Settings are
 // reached via their own header icon buttons instead, each a full-screen
 // panel with its own Back button, same pattern #panel-detail already used.
+// Tracked so the storage.onChanged listener below (added for the live-refresh
+// fix) knows whether History is the panel currently visible, without having
+// to re-query the DOM for whichever element has the "active" class.
+let currentPanelName = "main";
+
 function showPanel(name) {
+  currentPanelName = name;
   document.querySelectorAll(".panel").forEach((panel) => {
     panel.classList.toggle("active", panel.id === `panel-${name}`);
   });
@@ -964,6 +970,50 @@ async function refreshHistory() {
     emptyEl.classList.remove("hidden");
   }
 }
+
+// Same keys background.js's poll (pollCaptures -> notifyNewQuestions /
+// notifyStaleReady / notifyResolved) writes to chrome.storage.local on every
+// poll cycle -- see SEEN_RESOLVED_KEY, SEEN_QUESTION_ROUNDS_KEY,
+// UNREAD_RESOLVED_KEY, STALE_NOTIFIED_KEY there. Mirrored here as plain
+// strings rather than imported, since popup.js and background.js run in
+// separate script contexts (popup document vs. service worker).
+//
+// Without this, a side panel that's been sitting open the whole time never
+// hears about what a background poll just learned: the toolbar badge count
+// (driven by background.js's own storage.onChanged-independent updateBadge
+// call) updates fine, but #queue-list only ever gets re-rendered when
+// something in *this* document calls refreshQueue -- e.g. on open, or a
+// manual Refresh click. Real bug filed live: an item got resolved, the badge
+// showed "1", but the already-open panel's Open items list kept showing it
+// as "ready" until Refresh was clicked.
+const POLL_WRITTEN_KEYS = new Set([
+  "seenResolvedIds",
+  "seenQuestionRounds",
+  "unreadResolvedIds",
+  "staleNotifiedIds",
+]);
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  // chrome.storage.onChanged fires for every local write, including ones
+  // this popup document makes itself (settings, pending-URL bookkeeping,
+  // clearResolvedBadge's own unreadResolvedIds reset on open) -- filter down
+  // to the specific keys the background poll writes so this doesn't turn
+  // into a network refetch on every unrelated write, or a loop back into
+  // itself (refreshQueue/refreshHistory don't write any of these keys, so
+  // there's no cycle, but keep the filter tight regardless).
+  if (!Object.keys(changes).some((key) => POLL_WRITTEN_KEYS.has(key))) return;
+  // Also skip while the app shell isn't showing yet (e.g. during the
+  // connect gate, or clearResolvedBadge's write during init) -- nothing
+  // visible needs refreshing yet, and showApp's own refreshQueue call will
+  // run once it does.
+  if ($("app-shell").classList.contains("hidden")) return;
+
+  refreshQueue().catch(() => {});
+  if (currentPanelName === "history") {
+    refreshHistory().catch(() => {});
+  }
+});
 
 // ---------------------------------------------------------------------
 // Wiring
