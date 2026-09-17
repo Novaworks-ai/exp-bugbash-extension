@@ -3,6 +3,9 @@
 Generic Chrome/Edge (Manifest V3) capture extension for **any** Novaworks bug bash — not specific
 to any one consuming repo.
 
+**Taking part in a bug bash?** See [`USER_GUIDE.md`](USER_GUIDE.md) for install + usage
+instructions. This README is the design/development reference.
+
 ## Status: first cut, runnable locally
 
 A working extension exists under [`src/`](src/) — Capture / Queue / History / Settings tabs,
