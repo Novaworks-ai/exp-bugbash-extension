@@ -44,7 +44,7 @@ body.side-panel {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 8px 12px;
   background: var(--brand);
   color: #fff;
 }
@@ -54,31 +54,72 @@ body.side-panel {
   align-items: center;
   gap: 6px;
   font-weight: 600;
+  /* Now a <button> (clicking it goes home from History/Settings/Detail) --
+     reset it back to looking like the plain header text it was. */
+  background: none;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  padding: 0;
+  cursor: pointer;
 }
 
-.brand-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #fff;
-  display: inline-block;
+.brand-icon {
+  /* Bigger than the .pin-btn icon buttons on the right (30x30px) --
+     the brand mark gets more visual weight than the utility buttons. */
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
 }
 
 .version-badge {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 500;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   padding: 1px 6px;
-  margin-left: 4px;
 }
 
 .connect-status {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 11px;
   opacity: 0.9;
+}
+
+.pin-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 7px;
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  opacity: 1;
+}
+
+.pin-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.pin-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .dot {
@@ -119,39 +160,20 @@ body.side-panel {
   word-break: break-all;
 }
 
-.tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-muted);
-}
-
-.tab {
-  flex: 1;
-  border: none;
-  background: transparent;
-  padding: 8px 4px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-}
-
-.tab:hover {
-  color: var(--text);
-}
-
-.tab.active {
-  color: var(--brand);
-  border-bottom-color: var(--brand);
-  background: var(--bg);
-}
-
 .panels {
   padding: 12px;
   min-height: 220px;
   max-height: 480px;
   overflow-y: auto;
+}
+
+/* A popup has a hard OS-imposed max height (~600px), so an internal scroll
+   area makes sense there. A side panel can be much taller (the full browser
+   window) -- let it actually use that space instead of an artificial cap,
+   so the merged Capture+Queue view (and the queue especially) gets more
+   room to breathe. */
+body.side-panel .panels {
+  max-height: none;
 }
 
 .capture-grid {

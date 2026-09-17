@@ -51,6 +51,9 @@ async function showApp() {
   $("app-shell").classList.remove("hidden");
   await refreshConnectBadge();
   await refreshSettingsPanel();
+  // Queue lives right in #panel-main now (no separate tab to click into it
+  // any more), so it needs loading up front rather than on tab-switch.
+  await refreshQueue();
   await openPendingCaptureIfAny();
 }
 
@@ -196,6 +199,7 @@ async function refreshConnectBadge() {
   const dot = $("connect-dot");
   const label = $("connect-label");
   status.classList.remove("hidden");
+  refreshUiModeControls(settings.uiMode);
 
   if (!isConnected(settings)) {
     dot.className = "dot dot-off";
@@ -236,19 +240,16 @@ async function refreshSettingsPanel() {
       "ok"
     );
   }
-
-  refreshUiModeControls(settings.uiMode);
 }
 
 function refreshUiModeControls(uiMode) {
-  const label = $("settings-ui-mode-label");
   const btn = $("btn-toggle-ui-mode");
   if (uiMode === "sidepanel") {
-    label.textContent = "Pinned as a side panel — stays open across tabs.";
-    btn.textContent = "Unpin (use popup instead)";
+    btn.textContent = "📌";
+    btn.title = "Pinned as a side panel — click to switch back to a popup";
   } else {
-    label.textContent = "Currently a popup — closes when you click elsewhere.";
-    btn.textContent = "📌 Pin as side panel";
+    btn.textContent = "📍";
+    btn.title = "Currently a popup — click to pin as a side panel";
   }
 }
 
@@ -316,16 +317,25 @@ async function handleSaveTargetApp() {
 // Tabs
 // ---------------------------------------------------------------------
 
-function switchTab(name) {
-  document.querySelectorAll(".tab").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.tab === name);
-  });
+// No more tab bar -- Capture and Queue live together in #panel-main,
+// always visible at once (most useful in the side panel, open persistently
+// alongside whatever page is being tested). History and Settings are
+// reached via their own header icon buttons instead, each a full-screen
+// panel with its own Back button, same pattern #panel-detail already used.
+function showPanel(name) {
   document.querySelectorAll(".panel").forEach((panel) => {
     panel.classList.toggle("active", panel.id === `panel-${name}`);
   });
-  if (name === "queue") refreshQueue();
-  if (name === "history") refreshHistory();
-  if (name === "settings") refreshSettingsPanel();
+}
+
+async function openHistory() {
+  showPanel("history");
+  await refreshHistory();
+}
+
+async function openSettings() {
+  showPanel("settings");
+  await refreshSettingsPanel();
 }
 
 // ---------------------------------------------------------------------
@@ -527,8 +537,9 @@ async function handleSubmitClick() {
       pageUrl: currentPage.url,
       pageTitle: currentPage.title,
     });
-    showStatus(statusEl, `Submitted (id: ${result.id}). Watch the Queue tab for updates.`, "ok");
+    showStatus(statusEl, `Submitted (id: ${result.id}). See it in the queue below.`, "ok");
     setTimeout(resetCaptureForm, 1500);
+    await refreshQueue();
   } catch (err) {
     showStatus(statusEl, `Submit failed: ${err.message}`, "error");
   } finally {
@@ -628,14 +639,8 @@ function renderItemList(listEl, emptyEl, items, presence) {
   }
 }
 
-let detailReturnTab = "queue";
-
 async function openDetail(id) {
-  const activeTab = document.querySelector(".tab.active");
-  detailReturnTab = activeTab ? activeTab.dataset.tab : "queue";
-
-  document.querySelectorAll(".panel").forEach((panel) => panel.classList.remove("active"));
-  $("panel-detail").classList.add("active");
+  showPanel("detail");
   hideStatus($("detail-status"));
 
   try {
@@ -644,11 +649,6 @@ async function openDetail(id) {
   } catch (err) {
     showStatus($("detail-status"), `Couldn't load item: ${err.message}`, "error");
   }
-}
-
-function closeDetail() {
-  $("panel-detail").classList.remove("active");
-  switchTab(detailReturnTab);
 }
 
 function renderDetail(item) {
@@ -785,9 +785,6 @@ async function refreshHistory() {
 // ---------------------------------------------------------------------
 
 function wireUp() {
-  document.querySelectorAll(".tab").forEach((btn) => {
-    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
-  });
   $("btn-capture").addEventListener("click", handleCaptureClick);
   $("btn-retake").addEventListener("click", handleCaptureClick);
   $("btn-add-screenshot").addEventListener("click", handleAddScreenshotClick);
@@ -795,10 +792,16 @@ function wireUp() {
   $("btn-upload-screenshot-idle").addEventListener("click", handleUploadScreenshotClick);
   $("screenshot-upload-input").addEventListener("change", handleScreenshotUploadChange);
   $("btn-submit").addEventListener("click", handleSubmitClick);
+  $("btn-cancel-capture").addEventListener("click", resetCaptureForm);
   $("btn-refresh-queue").addEventListener("click", refreshQueue);
   $("btn-refresh-history").addEventListener("click", refreshHistory);
-  $("btn-detail-back").addEventListener("click", closeDetail);
   $("btn-detail-answer-submit").addEventListener("click", handleDetailAnswerSubmit);
+
+  // The only way back from History/Settings/Detail -- no separate Back
+  // button on each; clicking the brand always returns to #panel-main.
+  $("btn-home").addEventListener("click", () => showPanel("main"));
+  $("btn-open-history").addEventListener("click", openHistory);
+  $("btn-open-settings").addEventListener("click", openSettings);
 
   $("btn-gate-continue").addEventListener("click", handleGateContinue);
   $("btn-gate-signin").addEventListener("click", handleGateSignIn);

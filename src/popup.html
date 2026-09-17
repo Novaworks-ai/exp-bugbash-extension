@@ -7,14 +7,19 @@
 </head>
 <body>
   <header class="header">
-    <div class="brand">
-      <span class="brand-dot"></span>
-      <span class="brand-name">Bug Bash</span>
-      <span class="version-badge" id="version-badge">v0.2.0</span>
-    </div>
+    <button class="brand" id="btn-home" title="Back to Capture/Queue">
+      <img class="brand-icon" src="../icons/icon128.png" alt="" />
+      <span class="brand-text">
+        <span class="brand-name">Bug Bash</span>
+        <span class="version-badge" id="version-badge">v0.2.0</span>
+      </span>
+    </button>
     <div class="connect-status hidden" id="connect-status">
       <span class="dot dot-off" id="connect-dot"></span>
       <span id="connect-label">Not connected</span>
+      <button class="pin-btn" id="btn-toggle-ui-mode" title="Pin as side panel"></button>
+      <button class="pin-btn" id="btn-open-history" title="History">🕘</button>
+      <button class="pin-btn" id="btn-open-settings" title="Settings">⚙️</button>
     </div>
   </header>
 
@@ -39,15 +44,8 @@
   </main>
 
   <div id="app-shell" class="hidden">
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-tab="capture">Capture</button>
-      <button class="tab" data-tab="queue">Queue</button>
-      <button class="tab" data-tab="history">History</button>
-      <button class="tab" data-tab="settings">Settings</button>
-    </nav>
-
     <main class="panels">
-      <section class="panel active" id="panel-capture">
+      <section class="panel active" id="panel-main">
         <input type="file" id="screenshot-upload-input" accept="image/*" multiple class="hidden" />
 
         <div id="capture-idle">
@@ -75,14 +73,17 @@
             <textarea id="repro-steps" rows="4" placeholder="1. Click X...&#10;2. Navigate to Y..."></textarea>
             <label class="field-label" for="additional-info">Additional information</label>
             <textarea id="additional-info" rows="4" placeholder="What did you expect to happen instead? Anything else worth noting?"></textarea>
-            <button class="primary-btn" id="btn-submit">Submit</button>
+            <div class="row">
+              <button class="secondary-btn" id="btn-cancel-capture">Cancel</button>
+              <button class="primary-btn" id="btn-submit">Submit</button>
+            </div>
           </div>
         </div>
 
         <div id="capture-status" class="status hidden"></div>
-      </section>
 
-      <section class="panel" id="panel-queue">
+        <div class="divider"></div>
+
         <div class="panel-toolbar">
           <span class="panel-title">Open items</span>
           <button class="link-btn" id="btn-refresh-queue">Refresh</button>
@@ -101,7 +102,6 @@
       </section>
 
       <section class="panel" id="panel-detail">
-        <button class="link-btn" id="btn-detail-back">‹ Back</button>
         <div class="detail-desc" id="detail-description"></div>
         <div class="page-meta" id="detail-meta"></div>
         <div class="detail-status" id="detail-status-row"></div>
@@ -143,14 +143,6 @@
           <button class="secondary-btn" id="btn-save-target-app">Save</button>
         </div>
         <div class="status hidden" id="settings-target-app-status"></div>
-
-        <div class="divider"></div>
-
-        <label class="field-label">Window mode</label>
-        <p class="hint" id="settings-ui-mode-label"></p>
-        <div class="row">
-          <button class="secondary-btn" id="btn-toggle-ui-mode"></button>
-        </div>
       </section>
     </main>
   </div>
