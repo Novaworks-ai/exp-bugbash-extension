@@ -571,6 +571,14 @@ textarea:focus {
   color: #9a6b00;
 }
 
+.badge-partial {
+  /* Same amber family as deferred: the bug part is done, but something in
+     the report is still open -- not a clean "fixed" (green), not a failure
+     (unsolved, red). */
+  background: #fff3d6;
+  color: #9a6b00;
+}
+
 .detail-desc {
   font-size: 13px;
   font-weight: 600;

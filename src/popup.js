@@ -682,7 +682,7 @@ async function handleSubmitClick() {
 // ---------------------------------------------------------------------
 
 function displayStatus(item) {
-  // `resolution` (fixed/unsolved/duplicate/deferred) is the terminal state
+  // `resolution` (fixed/unsolved/duplicate/deferred/partial) is the terminal state
   // once the fixing pipeline has acted; `status`
   // (submitted/awaiting-clarification/ready/resolved) tracks the
   // critique/routing state up to that point. Neither one on its own says
@@ -822,7 +822,7 @@ function renderDetail(item) {
   if (item.resolution) {
     let kind = "error";
     if (item.resolution === "fixed" || item.resolution === "duplicate") kind = "ok";
-    else if (item.resolution === "deferred") kind = "info";
+    else if (item.resolution === "deferred" || item.resolution === "partial") kind = "info";
     let msg;
     if (item.resolution === "fixed") {
       msg = "Fixed — try the original action again.";
@@ -832,6 +832,8 @@ function renderDetail(item) {
         : "Duplicate of an already-fixed report.";
     } else if (item.resolution === "deferred") {
       msg = "Deferred — needs a developer's go-ahead before anyone takes it on.";
+    } else if (item.resolution === "partial") {
+      msg = "Partially fixed — part of this report is still open.";
     } else {
       msg = "Marked unsolved.";
     }
