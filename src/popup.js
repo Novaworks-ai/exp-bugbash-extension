@@ -370,15 +370,20 @@ async function dataUrlToBlob(dataUrl) {
 // "Either the '<all_urls>' or 'activeTab' permission is required." Recover
 // by requesting permission and retrying.
 //
-// This must request the broad "<scheme>://*/*" pattern (via
+// This must request the literal "<all_urls>" pattern (via
 // requestCapturePermission), not the narrow per-hostname pattern
-// originPatternFor/requestOriginPermission use elsewhere in settings.js:
-// captureVisibleTab specifically requires "activeTab" or a scheme-wide
-// host permission and does not accept a scoped single-hostname grant, even
-// though chrome.permissions.request/contains report one as granted. Using
-// the narrow pattern here would show a permission dialog that "succeeds"
-// but leaves the retried captureVisibleTab call failing with the exact
-// same error.
+// originPatternFor/requestOriginPermission use elsewhere in settings.js, and
+// not a scheme-wide pattern like "https://*/*" either: Chromium's
+// captureVisibleTab permission check (PermissionsData::CanCaptureVisiblePage)
+// only looks for a granted host-permission entry that is literally the
+// special <all_urls> pattern -- it is not satisfied by the union of however
+// many scheme- or host-specific patterns are granted alongside it. A prior
+// fix requested only the scheme matching the current tab's URL (e.g.
+// "https://*/*" for an https:// page); that shows a permission dialog that
+// "succeeds" and even reports granted via chrome.permissions.contains, but
+// still leaves the retried captureVisibleTab call failing with the exact
+// same error, since neither "http://*/*" nor "https://*/*" is the literal
+// <all_urls> token the check requires.
 async function takeScreenshot() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab) throw new Error("No active tab found.");
@@ -389,7 +394,7 @@ async function takeScreenshot() {
     if (!/activeTab/.test(err.message) || !tab.url) throw err;
     let granted = false;
     try {
-      granted = await requestCapturePermission(tab.url);
+      granted = await requestCapturePermission();
     } catch (_) {
       granted = false;
     }

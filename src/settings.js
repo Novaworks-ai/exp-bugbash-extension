@@ -122,26 +122,31 @@ async function requestOriginPermission(url) {
 // the backend/target-app permission (that's originPatternFor/
 // requestOriginPermission above, which stay narrow on purpose).
 //
-// chrome.tabs.captureVisibleTab specifically requires the "activeTab"
-// permission or a broad, scheme-wide host permission (e.g. "https://*/*");
-// unlike most chrome.tabs/chrome.scripting APIs, it does NOT accept a
-// narrow single-hostname grant (e.g. "https://github.com/*") even though
-// chrome.permissions.request/contains happily grant and report one. So
-// requesting the per-origin pattern here would show a permission dialog
-// that succeeds but still leaves the subsequent captureVisibleTab call
-// failing with the same "activeTab" error. Request the broad
-// "<scheme>://*/*" pattern instead -- it matches one of the
-// optional_host_permissions already declared in manifest.json
-// ("http://*/*", "https://*/*"), so this never prompts for something the
-// extension hasn't already declared it might ask for.
-function capturePermissionPatternFor(url) {
-  const parsed = new URL(url);
-  return `${parsed.protocol}//*/*`;
-}
-
-async function requestCapturePermission(url) {
+// chrome.tabs.captureVisibleTab's permission check (PermissionsData::
+// CanCaptureVisiblePage in Chromium) does NOT ask "is this URL covered by
+// some granted host permission?". It only ever sets `has_all_urls` when one
+// of the extension's *granted* host-permission patterns literally is the
+// special "<all_urls>" pattern (URLPattern::match_all_urls(), which Parse()
+// only sets for the exact string "<all_urls>" -- see
+// extensions/common/url_pattern.cc). Any number of scheme- or host-specific
+// patterns, however broad, never set that flag, even together:
+// "http://*/*" + "https://*/*" granted side by side is still two ordinary
+// URLPatterns, neither of which is the literal <all_urls> token, so
+// has_all_urls stays false and the capture keeps failing with "Either the
+// '<all_urls>' or 'activeTab' permission is required." (This is why a
+// previous fix that requested the matching "<scheme>://*/*" pattern didn't
+// actually fix anything: it "succeeded" as a permission grant but still left
+// the subsequent captureVisibleTab call failing with the exact same error --
+// and requesting only the scheme matching the current tab, e.g. only
+// "https://*/*" for an https:// page, is exactly the "half the permissions"
+// state a filer would see after hitting this path once before.)
+//
+// So request the literal "<all_urls>" pattern -- it must be pre-declared in
+// optional_host_permissions (see manifest.json) for chrome.permissions.request
+// to allow requesting it at runtime.
+async function requestCapturePermission() {
   try {
-    return await chrome.permissions.request({ origins: [capturePermissionPatternFor(url)] });
+    return await chrome.permissions.request({ origins: ["<all_urls>"] });
   } catch (_) {
     return false;
   }
