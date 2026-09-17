@@ -56,6 +56,10 @@ You only do this once — it's remembered until you use **Settings → Change se
 - Shows everything you've submitted that isn't resolved yet.
 - If a report needs more detail, it'll show a question — click the item to open it and answer in
   the box that appears. Answering re-runs the automatic review immediately.
+- A small green or red dot next to a routed item shows whether someone's actually connected and
+  working that queue right now — green means an agent is on it, red means nobody currently is (your
+  report is still safely queued either way, this just sets expectations on timing). No dot at all
+  means it hasn't been routed to a queue yet.
 
 **History tab** — your resolved reports, once someone's picked them up and marked them fixed (or
 explicitly not going to be fixed this round).

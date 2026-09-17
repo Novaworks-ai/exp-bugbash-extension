@@ -87,6 +87,14 @@ async function getCapture(id) {
   return apiRequest(`/captures/${encodeURIComponent(id)}`);
 }
 
+// Real connect/disconnect presence per fixing-pipeline agent (see
+// exp-bugbash-intake-py's app/agent_auth.py) -- used to show a green/red dot
+// per Queue item (see popup.js's buildOnlineFocusAreas). No agent token
+// needed to read this; only agents themselves authenticate to change it.
+async function listAgents() {
+  return apiRequest("/admin/agents");
+}
+
 async function answerClarification(id, answer) {
   return apiRequest(`/captures/${encodeURIComponent(id)}/answer`, {
     method: "POST",

@@ -403,6 +403,24 @@ textarea:focus {
   gap: 4px;
 }
 
+/* Real per-agent connect/disconnect presence (GET /admin/agents) for the
+   item's focus area -- see popup.js's buildOnlineFocusAreas/presenceDot. */
+.presence-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.presence-online {
+  background: var(--ok);
+}
+
+.presence-offline {
+  background: var(--danger);
+}
+
 .badge {
   font-size: 10px;
   font-weight: 600;

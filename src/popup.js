@@ -563,7 +563,41 @@ function focusAreaTag(item) {
   return span;
 }
 
-function renderItemList(listEl, emptyEl, items) {
+// Real per-agent connect/disconnect presence (GET /admin/agents), not a
+// guess -- built once per Queue refresh, then looked up per item below.
+function buildOnlineFocusAreas(agents) {
+  const online = new Set();
+  let anyWildcard = false;
+  for (const agent of agents) {
+    if (!agent.connected) continue;
+    for (const area of agent.focus_areas || []) {
+      if (area === "*") anyWildcard = true;
+      else online.add(area);
+    }
+  }
+  return { online, anyWildcard };
+}
+
+// null = presence unknown (fetch failed, or this list doesn't show it at
+// all -- History, where it's irrelevant). true/false once known.
+function isFocusAreaCovered(item, presence) {
+  if (!presence || !item.focus_area || item.focus_area === "unclassified") return null;
+  if (presence.anyWildcard) return true;
+  return presence.online.has(item.focus_area);
+}
+
+function presenceDot(item, presence) {
+  const covered = isFocusAreaCovered(item, presence);
+  if (covered === null) return null;
+  const span = document.createElement("span");
+  span.className = `presence-dot ${covered ? "presence-online" : "presence-offline"}`;
+  span.title = covered
+    ? `A connected agent is working the "${item.focus_area}" queue.`
+    : `No agent is currently connected for "${item.focus_area}".`;
+  return span;
+}
+
+function renderItemList(listEl, emptyEl, items, presence) {
   listEl.innerHTML = "";
   if (!items.length) {
     emptyEl.classList.remove("hidden");
@@ -581,6 +615,8 @@ function renderItemList(listEl, emptyEl, items) {
     when.textContent = new Date(item.created_at).toLocaleString();
     const badges = document.createElement("span");
     badges.className = "item-badges";
+    const dot = presenceDot(item, presence);
+    if (dot) badges.appendChild(dot);
     badges.appendChild(focusAreaTag(item));
     badges.appendChild(statusBadge(displayStatus(item)));
     meta.appendChild(when);
@@ -715,7 +751,15 @@ async function refreshQueue() {
   const emptyEl = $("queue-empty");
   try {
     const items = await listCaptures(false);
-    renderItemList(listEl, emptyEl, items);
+    // Best-effort: a failed agents fetch shouldn't block showing the queue
+    // itself -- items just render without a presence dot in that case.
+    let presence = null;
+    try {
+      presence = buildOnlineFocusAreas(await listAgents());
+    } catch (_) {
+      presence = null;
+    }
+    renderItemList(listEl, emptyEl, items, presence);
   } catch (err) {
     listEl.innerHTML = "";
     emptyEl.textContent = `Couldn't load: ${err.message}`;
