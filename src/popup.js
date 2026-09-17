@@ -347,10 +347,36 @@ async function dataUrlToBlob(dataUrl) {
   return res.blob();
 }
 
+// activeTab is granted once, when the extension surface is opened -- a
+// popup reopens (and re-grants it for whatever tab is active) every time,
+// but the side panel is a single persistent document, so switching tabs
+// while it stays open leaves it holding a grant for the tab it was FIRST
+// opened on, not the one now showing. captureVisibleTab then fails with
+// "Either the '<all_urls>' or 'activeTab' permission is required." Recover
+// by requesting that one tab's origin (same per-origin pattern settings.js
+// already uses for the target-app permission) and retrying, instead of
+// asking for a blanket <all_urls> grant.
 async function takeScreenshot() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab) throw new Error("No active tab found.");
-  const dataUrl = await chrome.tabs.captureVisibleTab(undefined, { format: "png" });
+  let dataUrl;
+  try {
+    dataUrl = await chrome.tabs.captureVisibleTab(undefined, { format: "png" });
+  } catch (err) {
+    if (!/activeTab/.test(err.message) || !tab.url) throw err;
+    let granted = false;
+    try {
+      granted = await requestOriginPermission(tab.url);
+    } catch (_) {
+      granted = false;
+    }
+    if (!granted) {
+      throw new Error(
+        `${err.message} Allow access to this page and try again.`
+      );
+    }
+    dataUrl = await chrome.tabs.captureVisibleTab(undefined, { format: "png" });
+  }
   currentPage = { url: tab.url || "", title: tab.title || "" };
   return { dataUrl, blob: await dataUrlToBlob(dataUrl), tabId: tab.id };
 }
