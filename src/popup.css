@@ -496,6 +496,13 @@ textarea:focus {
   color: var(--danger);
 }
 
+.badge-deferred {
+  /* Same amber as awaiting-clarification: needs a human/developer decision,
+     not a failure (unsolved, red) or a resolved outcome (fixed, green). */
+  background: #fff3d6;
+  color: #9a6b00;
+}
+
 .detail-desc {
   font-size: 13px;
   font-weight: 600;

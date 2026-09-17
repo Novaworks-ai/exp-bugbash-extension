@@ -704,7 +704,9 @@ function renderDetail(item) {
 
   const resolutionEl = $("detail-resolution");
   if (item.resolution) {
-    const kind = item.resolution === "fixed" || item.resolution === "duplicate" ? "ok" : "error";
+    let kind = "error";
+    if (item.resolution === "fixed" || item.resolution === "duplicate") kind = "ok";
+    else if (item.resolution === "deferred") kind = "info";
     let msg;
     if (item.resolution === "fixed") {
       msg = "Fixed — try the original action again.";
@@ -712,6 +714,8 @@ function renderDetail(item) {
       msg = item.duplicate_of
         ? `Duplicate of an already-fixed report (${item.duplicate_of}).`
         : "Duplicate of an already-fixed report.";
+    } else if (item.resolution === "deferred") {
+      msg = "Deferred — needs a developer's go-ahead before anyone takes it on.";
     } else {
       msg = "Marked unsolved.";
     }
