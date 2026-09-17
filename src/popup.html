@@ -56,6 +56,10 @@
             <span>Test scope</span>
             <button class="link-btn" id="btn-dismiss-focus-areas">Dismiss</button>
           </div>
+          <!-- Optional BUG_BASH_INFO / BUG_BASH_INFO_URL (from GET
+               /focus_areas) -- hidden entirely when the deployment sets
+               neither. See refreshFocusAreas / renderBugBashInfo. -->
+          <p class="hint hidden" id="focus-areas-info"></p>
           <p class="hint" id="focus-areas-list"></p>
         </div>
 

@@ -837,6 +837,56 @@ async function refreshQueue() {
   }
 }
 
+// Renders the optional top info line from GET /focus_areas' bug_bash_info /
+// bug_bash_info_url (both independent and optional -- either, both, or
+// neither may be set):
+//   - both set: bug_bash_info text, clickable to bug_bash_info_url
+//   - only bug_bash_info_url: the URL itself shown as the clickable text
+//   - only bug_bash_info: plain, non-clickable text
+//   - neither: element stays hidden (no change from before this existed)
+function renderBugBashInfo(info, infoUrl) {
+  const el = $("focus-areas-info");
+  el.innerHTML = "";
+  if (!info && !infoUrl) {
+    el.classList.add("hidden");
+    return;
+  }
+
+  if (infoUrl) {
+    const link = document.createElement("a");
+    link.href = infoUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = info || infoUrl;
+    el.appendChild(link);
+  } else {
+    el.textContent = info;
+  }
+  el.classList.remove("hidden");
+}
+
+// Builds the " · "-joined focus-area list as real DOM nodes rather than one
+// joined string, so an area with a `url` can render as a clickable <a>
+// while one without stays plain text -- a single textContent string can't
+// mix the two.
+function renderFocusAreaList(areas) {
+  const el = $("focus-areas-list");
+  el.innerHTML = "";
+  areas.forEach((area, i) => {
+    if (i > 0) el.appendChild(document.createTextNode(" · "));
+    if (area.url) {
+      const link = document.createElement("a");
+      link.href = area.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = area.label;
+      el.appendChild(link);
+    } else {
+      el.appendChild(document.createTextNode(area.label));
+    }
+  });
+}
+
 // Bug bash "starts with no context" otherwise -- this is the test scope
 // (focus areas a report may get routed into) so a first-time filer sees it
 // as soon as #panel-main opens, without hunting through Settings.
@@ -849,13 +899,18 @@ async function refreshFocusAreas() {
   }
 
   try {
-    const areas = await listFocusAreas();
+    const { areas, bug_bash_info, bug_bash_info_url } = await listFocusAreas();
     const visible = areas.filter((area) => area.key !== "unclassified");
+    renderBugBashInfo(bug_bash_info, bug_bash_info_url);
+    const hasInfo = Boolean(bug_bash_info || bug_bash_info_url);
     if (visible.length === 0) {
-      bannerEl.classList.add("hidden");
+      $("focus-areas-list").innerHTML = "";
+      // Keep the banner up if there's still a top info line to show even
+      // with no (or only "unclassified") focus areas configured.
+      bannerEl.classList.toggle("hidden", !hasInfo);
       return;
     }
-    $("focus-areas-list").textContent = visible.map((area) => area.label).join(" · ");
+    renderFocusAreaList(visible);
     bannerEl.classList.remove("hidden");
   } catch (_) {
     // Best-effort context only -- a failed fetch just means no banner, same
