@@ -93,6 +93,9 @@ async function pingBackend() {
 // The "test scope" for this bug bash -- the configured focus areas a report
 // may get routed into (config/focus_areas.yaml on the intake service). Public
 // on the backend (same as /auth/config), so this works even before sign-in.
+// Returns { areas: [{key, label, keywords, url}], bug_bash_info, bug_bash_info_url }
+// -- the latter two are the deployment-wide optional info line shown above
+// the per-area list (see popup.js's refreshFocusAreas/renderBugBashInfo).
 async function listFocusAreas() {
   return apiRequest("/focus_areas");
 }

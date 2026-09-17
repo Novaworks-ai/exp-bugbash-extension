@@ -396,6 +396,18 @@ textarea:focus {
   margin: 4px 0 0;
 }
 
+/* Clickable focus-area labels / the optional top BUG_BASH_INFO(_URL) line --
+   kept minimal, reusing .hint's existing color/size rather than new heavy
+   styling; just enough to read as a link. */
+#focus-areas-banner a {
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+
+#focus-areas-banner a:hover {
+  color: var(--brand);
+}
+
 .panel-toolbar {
   display: flex;
   align-items: center;
