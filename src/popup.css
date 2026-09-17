@@ -226,6 +226,22 @@ body.side-panel .panels {
   border: 1px solid var(--border);
 }
 
+/* Detail-view screenshot thumbnails (renderDetail() in popup.js) -- same
+   list/image base as the pre-submit preview above, just bigger (click
+   target + actually legible) and clickable instead of removable. */
+.detail-thumbs li {
+  width: 96px;
+  height: 96px;
+}
+
+.detail-thumbs img {
+  cursor: pointer;
+}
+
+.detail-thumbs img:hover {
+  border-color: var(--brand);
+}
+
 .thumb-remove {
   position: absolute;
   top: -6px;
@@ -297,6 +313,19 @@ body.side-panel .panels {
   font-size: 12px;
   cursor: pointer;
   padding: 0;
+}
+
+/* Small inline icon button -- currently only "reopen the dismissed Test
+   scope banner" (btn-show-test-scope), next to the capture-idle hint text. */
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--brand);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 2px;
+  vertical-align: middle;
 }
 
 .row {

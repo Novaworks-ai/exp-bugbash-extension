@@ -104,6 +104,20 @@ async function getCapture(id) {
   return apiRequest(`/captures/${encodeURIComponent(id)}`);
 }
 
+// Screenshot bytes require a real bearer token (the filer's own Entra ID
+// token, or a fixing-pipeline agent's -- see exp-bugbash-intake-py's
+// get_current_agent_or_filer), so this goes through authorizedFetch like
+// every other filer-facing call, not a bare <img src> (which can't attach an
+// Authorization header at all). Returns a Blob, not JSON -- apiRequest()
+// doesn't fit here.
+async function getScreenshotBlob(captureId, ordinal) {
+  const res = await authorizedFetch(`/captures/${encodeURIComponent(captureId)}/screenshots/${ordinal}`);
+  if (!res.ok) {
+    throw new Error(`${res.status} ${await parseErrorDetail(res)}`);
+  }
+  return res.blob();
+}
+
 // Real connect/disconnect presence per fixing-pipeline agent (see
 // exp-bugbash-intake-py's app/agent_auth.py) -- used to show a green/red dot
 // per Queue item (see popup.js's buildOnlineFocusAreas). No agent token

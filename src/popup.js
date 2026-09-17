@@ -792,6 +792,7 @@ async function openDetail(id) {
 function renderDetail(item) {
   $("detail-description").textContent = item.description;
   $("detail-meta").textContent = `${item.page_title || ""} — ${item.page_url || ""}`;
+  renderDetailScreenshots(item);
 
   const statusRow = $("detail-status-row");
   statusRow.innerHTML = "";
@@ -873,6 +874,60 @@ function renderDetail(item) {
     answerBox.dataset.captureId = item.id;
   } else {
     answerBox.classList.add("hidden");
+  }
+}
+
+// Converts a Blob to a data: URL (rather than URL.createObjectURL) because
+// the resulting URL is handed to chrome.tabs.create() -- a blob: URL is only
+// valid for as long as the document that created it stays alive, and this
+// popup can close (losing focus to the very tab it just opened) well before
+// that new tab finishes loading it.
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Bumped on every call so an in-flight fetch from a since-abandoned call
+// knows to discard its result instead of rendering into the (by then wrong)
+// item's detail view -- e.g. opening item A, then quickly opening item B
+// before A's screenshot fetch resolves.
+let _detailScreenshotsRequestId = 0;
+
+// Fire-and-forget from renderDetail() -- screenshot bytes are a separate,
+// possibly-slow fetch (a real network round trip, unlike the rest of the
+// detail view which is already-fetched capture JSON), so this shouldn't
+// block anything else from rendering.
+async function renderDetailScreenshots(item) {
+  const requestId = ++_detailScreenshotsRequestId;
+  const listEl = $("detail-screenshots");
+  listEl.innerHTML = "";
+  listEl.classList.add("hidden");
+  const paths = item.screenshot_paths || [];
+
+  for (let ordinal = 0; ordinal < paths.length; ordinal++) {
+    let blob;
+    try {
+      blob = await getScreenshotBlob(item.id, ordinal);
+    } catch (_) {
+      continue; // one missing/failed screenshot shouldn't block the rest
+    }
+    if (requestId !== _detailScreenshotsRequestId) return; // a newer item was opened meanwhile
+
+    const li = document.createElement("li");
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(blob);
+    img.alt = `Screenshot ${ordinal + 1}`;
+    img.title = "Click to open full size in a new tab";
+    img.addEventListener("click", async () => {
+      chrome.tabs.create({ url: await blobToDataUrl(blob) });
+    });
+    listEl.appendChild(li);
+    li.appendChild(img);
+    listEl.classList.remove("hidden");
   }
 }
 
@@ -965,11 +1020,14 @@ function renderFocusAreaList(areas) {
 // as soon as #panel-main opens, without hunting through Settings.
 async function refreshFocusAreas() {
   const bannerEl = $("focus-areas-banner");
+  const showIconEl = $("btn-show-test-scope");
   const { focusAreasBannerDismissed } = await getSettings();
   if (focusAreasBannerDismissed) {
     bannerEl.classList.add("hidden");
+    showIconEl.classList.remove("hidden");
     return;
   }
+  showIconEl.classList.add("hidden");
 
   try {
     const { areas, bug_bash_info, bug_bash_info_url } = await listFocusAreas();
@@ -999,6 +1057,16 @@ async function refreshFocusAreas() {
 async function handleDismissFocusAreas() {
   await setSettings({ focusAreasBannerDismissed: true });
   $("focus-areas-banner").classList.add("hidden");
+  $("btn-show-test-scope").classList.remove("hidden");
+}
+
+// Undoes handleDismissFocusAreas -- the (i) icon next to the capture-idle
+// hint text, only shown once the banner has actually been dismissed (see
+// refreshFocusAreas). Without this there was no way back to the "Test
+// scope" banner short of digging through extension storage.
+async function handleShowTestScope() {
+  await setSettings({ focusAreasBannerDismissed: false });
+  await refreshFocusAreas();
 }
 
 async function refreshHistory() {
@@ -1076,6 +1144,7 @@ function wireUp() {
   $("btn-refresh-queue").addEventListener("click", refreshQueue);
   $("btn-refresh-history").addEventListener("click", refreshHistory);
   $("btn-dismiss-focus-areas").addEventListener("click", handleDismissFocusAreas);
+  $("btn-show-test-scope").addEventListener("click", handleShowTestScope);
   $("btn-detail-answer-submit").addEventListener("click", handleDetailAnswerSubmit);
 
   // The only way back from History/Settings/Detail -- no separate Back
