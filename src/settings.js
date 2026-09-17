@@ -26,6 +26,12 @@ const DEFAULTS = {
   // background.js injects as the X-Bugbash-Trace-Id header on requests to
   // that site, so the intake service can grep its logs for it.
   traceId: "",
+
+  // "popup" (default) or "sidepanel" -- see background.js's
+  // applySidePanelBehavior(), which mirrors this into
+  // chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick }). Toggled
+  // via the Settings tab's Pin/Unpin button.
+  uiMode: "popup",
 };
 
 async function getOrCreateTraceId() {

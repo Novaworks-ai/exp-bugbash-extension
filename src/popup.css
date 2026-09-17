@@ -17,7 +17,12 @@
 
 body {
   margin: 0;
+  /* A popup window has no outer constraint, so this renders at the full
+     620px as before. A side panel (see manifest.json's "side_panel") is a
+     resizable iframe that's often narrower -- max-width keeps this from
+     forcing horizontal scroll there instead of just shrinking to fit. */
   width: 620px;
+  max-width: 100vw;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 13px;
   color: var(--text);
@@ -142,6 +147,14 @@ body {
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: 16px;
+}
+
+/* A side panel can be narrower than the two-column layout needs -- stack
+   instead of squeezing the screenshot column. */
+@media (max-width: 520px) {
+  .capture-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .capture-col-media .secondary-btn {

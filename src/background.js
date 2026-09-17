@@ -142,6 +142,18 @@ async function applyConsoleCaptureScript() {
   ]);
 }
 
+// Pin/Unpin (Settings tab): whether clicking the toolbar icon opens the
+// popup (default) or this same page as a side panel instead --
+// chrome.sidePanel.setPanelBehavior is a stored, global preference, not
+// per-tab state, so this just mirrors settings.uiMode into it. Actually
+// opening the side panel the first time (a real user gesture, done from
+// popup.js's click handler) is separate from this -- this only controls
+// what happens on the *next* icon click.
+async function applySidePanelBehavior() {
+  const settings = await getSettings();
+  await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: settings.uiMode === "sidepanel" });
+}
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && (changes.targetAppUrl || changes.traceId)) {
     applyTraceHeaderRule().catch(() => {});
@@ -149,11 +161,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.targetAppUrl) {
     applyConsoleCaptureScript().catch(() => {});
   }
+  if (area === "local" && changes.uiMode) {
+    applySidePanelBehavior().catch(() => {});
+  }
 });
 
 chrome.runtime.onStartup.addListener(() => {
   applyTraceHeaderRule().catch(() => {});
   applyConsoleCaptureScript().catch(() => {});
+  applySidePanelBehavior().catch(() => {});
   updateBadge().catch(() => {});
 });
 
@@ -161,6 +177,7 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create(POLL_ALARM, { periodInMinutes: 1 });
   applyTraceHeaderRule().catch(() => {});
   applyConsoleCaptureScript().catch(() => {});
+  applySidePanelBehavior().catch(() => {});
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {

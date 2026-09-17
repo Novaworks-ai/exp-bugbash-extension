@@ -236,6 +236,42 @@ async function refreshSettingsPanel() {
       "ok"
     );
   }
+
+  refreshUiModeControls(settings.uiMode);
+}
+
+function refreshUiModeControls(uiMode) {
+  const label = $("settings-ui-mode-label");
+  const btn = $("btn-toggle-ui-mode");
+  if (uiMode === "sidepanel") {
+    label.textContent = "Pinned as a side panel — stays open across tabs.";
+    btn.textContent = "Unpin (use popup instead)";
+  } else {
+    label.textContent = "Currently a popup — closes when you click elsewhere.";
+    btn.textContent = "📌 Pin as side panel";
+  }
+}
+
+async function handleToggleUiMode() {
+  const settings = await getSettings();
+  const newMode = settings.uiMode === "sidepanel" ? "popup" : "sidepanel";
+  await setSettings({ uiMode: newMode });
+  refreshUiModeControls(newMode);
+
+  if (newMode === "sidepanel") {
+    // Flip which one future icon clicks open (background.js mirrors
+    // uiMode into chrome.sidePanel.setPanelBehavior), and also open the
+    // side panel right now -- chrome.sidePanel.open() needs a user gesture,
+    // which this click handler is. The popup closes itself right after,
+    // since showing both at once would just be the same UI twice.
+    const win = await chrome.windows.getCurrent();
+    await chrome.sidePanel.open({ windowId: win.id });
+    window.close();
+  }
+  // Switching back to popup mode: nothing to close programmatically --
+  // Chrome has no API to close an open side panel from script. It stays
+  // open until the user closes it manually; the toolbar icon opens the
+  // popup again starting with the next click.
 }
 
 async function handleSignOut() {
@@ -727,6 +763,7 @@ function wireUp() {
   $("btn-sign-out").addEventListener("click", handleSignOut);
   $("btn-change-service").addEventListener("click", handleChangeServiceFromSettings);
   $("btn-save-target-app").addEventListener("click", handleSaveTargetApp);
+  $("btn-toggle-ui-mode").addEventListener("click", handleToggleUiMode);
 }
 
 async function clearResolvedBadge() {
