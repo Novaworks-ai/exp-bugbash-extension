@@ -84,6 +84,18 @@ To exercise the real Entra ID path locally, run the backend with `AUTH_DISABLED=
 - The background poll's new-question notification doesn't distinguish "asked while I was away" from
   "asked seconds ago" — both fire the same way once the 1-minute alarm ticks past it.
 
+### Future asks
+
+- **A "stream of changes" feed under Open items** — filers have twice asked (independently) for
+  something showing what changed recently, ideally a collapsible accordion, rather than relying
+  solely on toast notifications and the toolbar badge count to notice a status change. The live
+  panel-refresh fix (popup.js reacting to `chrome.storage.onChanged`) and the notification-alarm
+  reliability fix both address *getting notified something changed*, but neither adds a visible
+  history/feed of *what* changed and *when*. Needs a developer to specify the design before an
+  agent builds it — open questions include: one bug-bash-wide feed or per-item; what counts as an
+  entry (status transitions? new questions? resolutions?); how far back it should show; and how it
+  interacts with the existing History tab.
+
 Everything below this point is the original pre-build spec, kept as the design record.
 
 ---
