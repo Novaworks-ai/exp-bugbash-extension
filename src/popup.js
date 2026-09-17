@@ -1,6 +1,11 @@
 let currentScreenshots = []; // [{ dataUrl, blob }, ...] -- [0] is shown in the main preview
 let currentPage = null; // { url, title }
 let currentConsoleErrors = []; // [{ level, message, timestamp }, ...] -- see fetchConsoleErrors
+// True when currentPage was populated from an uploaded screenshot rather
+// than a live "Capture this page" -- gates the "Include this page's info"
+// checkbox (a live capture is always about the current page, so it never
+// applies there). Reset in takeScreenshot() / handleScreenshotUploadChange().
+let currentPageFromUpload = false;
 
 function $(id) {
   return document.getElementById(id);
@@ -406,6 +411,7 @@ async function takeScreenshot() {
     dataUrl = await chrome.tabs.captureVisibleTab(undefined, { format: "png" });
   }
   currentPage = { url: tab.url || "", title: tab.title || "" };
+  currentPageFromUpload = false;
   return { dataUrl, blob: await dataUrlToBlob(dataUrl), tabId: tab.id };
 }
 
@@ -444,8 +450,28 @@ function resetCaptureForm() {
   currentScreenshots = [];
   renderScreenshotThumbs();
   currentPage = null;
+  currentPageFromUpload = false;
+  $("include-page-meta").checked = true;
+  $("page-meta-toggle-row").classList.add("hidden");
   currentConsoleErrors = [];
   renderConsoleErrorsHint();
+}
+
+// Whether pageUrl/pageTitle should actually be sent: always true for a live
+// capture (the whole point is the current page); for an uploaded screenshot,
+// only when the "Include this page's info" checkbox is checked.
+function shouldIncludePageMeta() {
+  return !currentPageFromUpload || $("include-page-meta").checked;
+}
+
+// Keeps #page-meta's text and the checkbox's visibility in sync with
+// currentPage / currentPageFromUpload. The checkbox only makes sense (and is
+// only shown) for an uploaded screenshot -- see currentPageFromUpload.
+function renderPageMeta() {
+  $("page-meta-toggle-row").classList.toggle("hidden", !currentPageFromUpload);
+  $("page-meta").textContent = shouldIncludePageMeta()
+    ? `${currentPage.title} — ${currentPage.url}`
+    : "";
 }
 
 function renderConsoleErrorsHint() {
@@ -465,7 +491,7 @@ async function handleCaptureClick() {
     const shot = await takeScreenshot();
     currentScreenshots[0] = shot;
     $("preview-img").src = shot.dataUrl;
-    $("page-meta").textContent = `${currentPage.title} — ${currentPage.url}`;
+    renderPageMeta();
     $("capture-idle").classList.add("hidden");
     $("capture-preview").classList.remove("hidden");
     renderScreenshotThumbs();
@@ -512,6 +538,8 @@ async function handleScreenshotUploadChange(event) {
     } catch (_) {
       currentPage = { url: "", title: "" };
     }
+    currentPageFromUpload = true;
+    $("include-page-meta").checked = true;
   }
 
   try {
@@ -530,7 +558,7 @@ async function handleScreenshotUploadChange(event) {
   }
 
   $("preview-img").src = currentScreenshots[0].dataUrl;
-  $("page-meta").textContent = `${currentPage.title} — ${currentPage.url}`;
+  renderPageMeta();
   $("capture-idle").classList.add("hidden");
   $("capture-preview").classList.remove("hidden");
   renderScreenshotThumbs();
@@ -585,11 +613,12 @@ async function handleSubmitClick() {
   submitBtn.disabled = true;
   showStatus(statusEl, "Submitting…", "info");
   try {
+    const includePageMeta = shouldIncludePageMeta();
     const result = await submitCapture({
       blobs: currentScreenshots.map((shot) => shot.blob),
       description,
-      pageUrl: currentPage.url,
-      pageTitle: currentPage.title,
+      pageUrl: includePageMeta ? currentPage.url : "",
+      pageTitle: includePageMeta ? currentPage.title : "",
     });
     showStatus(statusEl, `Submitted (id: ${result.id}). See it in the queue below.`, "ok");
     setTimeout(resetCaptureForm, 1500);
@@ -947,6 +976,7 @@ function wireUp() {
   $("btn-upload-screenshot").addEventListener("click", handleUploadScreenshotClick);
   $("btn-upload-screenshot-idle").addEventListener("click", handleUploadScreenshotClick);
   $("screenshot-upload-input").addEventListener("change", handleScreenshotUploadChange);
+  $("include-page-meta").addEventListener("change", renderPageMeta);
   $("btn-submit").addEventListener("click", handleSubmitClick);
   $("btn-cancel-capture").addEventListener("click", resetCaptureForm);
   $("btn-refresh-queue").addEventListener("click", refreshQueue);

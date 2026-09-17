@@ -357,6 +357,24 @@ textarea:focus {
   word-break: break-all;
 }
 
+/* Only shown when the current screenshot(s) came from an upload rather than
+   a live "Capture this page" -- lets the filer opt out of attaching the
+   active tab's URL/title, which may have nothing to do with an uploaded
+   image. See handleScreenshotUploadChange / renderPageMeta in popup.js. */
+.page-meta-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  cursor: pointer;
+}
+
+.page-meta-toggle input {
+  margin: 0;
+}
+
 .divider {
   height: 1px;
   background: var(--border);
