@@ -167,6 +167,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 chrome.runtime.onStartup.addListener(() => {
+  // onInstalled only fires on install/update, so if the poll alarm was ever
+  // dropped (Chrome doesn't guarantee alarms survive every browser update or
+  // profile event) polling would otherwise stay dead until the next install
+  // -- chrome.alarms.create is idempotent, so recreating it here on every
+  // browser start is a safe no-op when it already exists and a silent fix
+  // when it doesn't.
+  chrome.alarms.create(POLL_ALARM, { periodInMinutes: 1 });
   applyTraceHeaderRule().catch(() => {});
   applyConsoleCaptureScript().catch(() => {});
   applySidePanelBehavior().catch(() => {});
