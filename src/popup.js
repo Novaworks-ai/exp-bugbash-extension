@@ -161,11 +161,23 @@ async function handleGateSignIn() {
 
   showStatus(statusEl, "Opening Microsoft sign-in…", "info");
   try {
-    await signInWithEntra(entraConfigFrom(settings));
+    // Delegated to background.js: the Microsoft sign-in window it opens
+    // steals focus and closes this popup mid-await, same as a native
+    // permission dialog -- the service worker isn't torn down by that, so it
+    // runs the flow to completion and stores the token regardless of
+    // whether this popup is still around to see the response.
+    const response = await chrome.runtime.sendMessage({ type: "start-entra-signin" });
+    if (response?.error) {
+      showStatus(statusEl, `Sign-in failed: ${response.error}`, "error");
+      return;
+    }
     hideStatus(statusEl);
     await showApp();
   } catch (err) {
-    showStatus(statusEl, `Sign-in failed: ${err.message}`, "error");
+    // The popup closing mid-flow (see above) surfaces here as a disconnected
+    // message port -- not a real failure. Reopening the popup will find the
+    // token already stored by background.js, via resolveConnection()'s
+    // isTokenValid check, with no further click needed.
   }
 }
 

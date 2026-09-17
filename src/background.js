@@ -27,6 +27,30 @@ const STALE_NOTIFIED_KEY = "staleNotifiedIds";
 
 importScripts("settings.js", "oauth.js", "api.js");
 
+// Runs the interactive Sign in with Microsoft flow here, not in popup.js.
+// chrome.identity.launchWebAuthFlow opens a real browser window for the
+// Microsoft login page -- that window taking focus closes the extension
+// popup (same focus-stealing behavior as a native chrome.permissions.request
+// dialog, see PENDING_BACKEND_URL_KEY in popup.js), which would otherwise
+// destroy the popup's own JS context mid-await and silently drop the result
+// even after a real, successful login. The service worker isn't torn down by
+// focus changes, so it runs this to completion and writes the resulting
+// token to storage; the popup picks it up next time it opens (see
+// resolveConnection()'s isTokenValid check) with no extra click needed.
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== "start-entra-signin") return false;
+  (async () => {
+    try {
+      const settings = await getSettings();
+      await signInWithEntra(entraConfigFrom(settings));
+      sendResponse({ ok: true });
+    } catch (err) {
+      sendResponse({ error: err.message });
+    }
+  })();
+  return true; // keep the message channel open for the async sendResponse above
+});
+
 // Log-correlation trace header: if the filer has configured a target app
 // (Settings) and granted permission for its origin, every request to that
 // site carries X-Bugbash-Trace-Id so the intake service can grep its own
