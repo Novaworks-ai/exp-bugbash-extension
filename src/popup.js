@@ -819,6 +819,13 @@ async function clearResolvedBadge() {
 
 (async function init() {
   $("version-badge").textContent = `v${chrome.runtime.getManifest().version}`;
+  // Same popup.html serves both surfaces -- manifest.json's side_panel
+  // points at "?panel=1" specifically so this document can tell which one
+  // it actually is (there's no other reliable way to distinguish them) and
+  // apply the side-panel-only width rule (see popup.css's body.side-panel).
+  if (new URLSearchParams(location.search).has("panel")) {
+    document.body.classList.add("side-panel");
+  }
   wireUp();
   await clearResolvedBadge();
   await resolveConnection();

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bug Bash Capture",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Capture a screenshot + description of a bug during a bug-bash session and send it to a configured intake service.",
   "action": {
     "default_popup": "src/popup.html",
@@ -11,7 +11,7 @@
     "service_worker": "src/background.js"
   },
   "side_panel": {
-    "default_path": "src/popup.html"
+    "default_path": "src/popup.html?panel=1"
   },
   "permissions": [
     "activeTab",

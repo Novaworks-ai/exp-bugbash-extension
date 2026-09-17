@@ -17,16 +17,27 @@
 
 body {
   margin: 0;
-  /* A popup window has no outer constraint, so this renders at the full
-     620px as before. A side panel (see manifest.json's "side_panel") is a
-     resizable iframe that's often narrower -- max-width keeps this from
-     forcing horizontal scroll there instead of just shrinking to fit. */
+  /* Fixed, not viewport-relative: a popup has no stable outer viewport for
+     `vw`/`%` to resolve against before Chrome sizes the popup window itself,
+     so a relative width here locks the whole popup at whatever small size
+     that resolves to instead of the intended 620px (this broke once,
+     verified live -- don't reintroduce it). The side panel case is instead
+     handled by body.side-panel below, applied only when popup.js detects it
+     really is running in the side panel (the ?panel=1 query param on
+     manifest.json's side_panel.default_path), never by default. */
   width: 620px;
-  max-width: 100vw;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 13px;
   color: var(--text);
   background: var(--bg);
+}
+
+/* Applied only when popup.js confirms this document is actually the side
+   panel (a real, resizable host with its own genuine viewport -- safe to
+   use relative sizing here, unlike the popup case above). */
+body.side-panel {
+  width: 100%;
+  min-width: 0;
 }
 
 .header {
