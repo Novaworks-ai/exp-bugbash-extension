@@ -551,10 +551,35 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
+// Same activeTab-permission gap as takeScreenshot() below -- executeScript
+// needs a host permission covering this tab's URL, and activeTab alone
+// often isn't enough (a side panel's activeTab grant, in particular, is
+// pinned to whichever tab was active when the panel first opened, not
+// necessarily the one showing now). Unlike captureVisibleTab,
+// executeScript's own permission check is satisfied by any granted host
+// pattern that covers the URL, not specifically the literal "<all_urls>"
+// token -- but requesting "<all_urls>" (requestCapturePermission, already
+// used below for the screenshot step) covers every case in one prompt
+// rather than asking again per-origin.
+async function injectPinPicker(tabId) {
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["src/pin-picker.js"] });
+  } catch (err) {
+    let granted = false;
+    try {
+      granted = await requestCapturePermission();
+    } catch (_) {
+      granted = false;
+    }
+    if (!granted) throw new Error(`${err.message} Allow access to this page and try again.`);
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["src/pin-picker.js"] });
+  }
+}
+
 async function pickElementOnPage(tabId) {
   return new Promise((resolve, reject) => {
     pinPickResolve = resolve;
-    chrome.scripting.executeScript({ target: { tabId }, files: ["pin-picker.js"] }).catch((err) => {
+    injectPinPicker(tabId).catch((err) => {
       pinPickResolve = null;
       reject(err);
     });
