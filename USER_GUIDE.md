@@ -43,8 +43,11 @@ You only do this once — it's remembered until you use **Settings → Change se
 
 **Capture tab** — report a bug:
 
-- **Capture this page** grabs a screenshot of whatever tab is currently active and visible.
-- **Upload a screenshot…** lets you attach an existing image file instead (or in addition — click
+- **Pin & Capture** lets you click the exact element your report is about first — click it, then a
+  window opens with the screenshot and that element already marked; draw on it if you want to point
+  out anything else before continuing.
+- **Capture** grabs a screenshot of whatever tab is currently active and visible, as-is.
+- **Upload…** lets you attach an existing image file instead (or in addition — click
   **+ Add screenshot** or **Upload…** in the preview screen to attach more than one).
 - Fill in **Steps to reproduce** and **Additional information** (what you expected to happen,
   anything else worth noting) — the more concrete these are, the less likely you'll be asked a
@@ -60,6 +63,9 @@ You only do this once — it's remembered until you use **Settings → Change se
   working that queue right now — green means an agent is on it, red means nobody currently is (your
   report is still safely queued either way, this just sets expectations on timing). No dot at all
   means it hasn't been routed to a queue yet.
+- A small 🐞/💡/💬 tag shows how the automatic review classified your report — defect, idea/
+  improvement, or other (kudos, a question, anything that isn't really a bug). It's informational
+  only; it doesn't change how your report gets handled.
 
 **History tab** — your resolved reports, once someone's picked them up and marked them fixed (or
 explicitly not going to be fixed this round).

@@ -8,12 +8,15 @@ instructions. This README is the design/development reference.
 
 ## Status: first cut, runnable locally
 
-A working extension exists under [`src/`](src/) — Capture / Queue / History / Settings tabs,
-`chrome.tabs.captureVisibleTab()` capture, submit to a configured intake service, an in-popup
-clarification answer flow, a real Sign in with Microsoft flow, and a background poll that notifies
-on two kinds of change: a new clarification question, and an item marked fixed/unsolved. Everything
-past this section is the original design spec this build started from — still accurate as the
-target shape, kept as-is rather than rewritten now.
+A working extension exists under [`src/`](src/) — Capture / Queue / History / Settings tabs, three
+capture entry points (**Capture**: `chrome.tabs.captureVisibleTab()` as-is; **Pin & Capture**: click
+a specific element first — `src/pin-picker.js` computes its CSS selector, shadow-DOM- and
+nested-frame-aware — then draw on the screenshot in its own real window, `src/annotate.html`/`.js`,
+since the popup/side panel is too narrow for that; **Upload**: attach an existing image), submit to a
+configured intake service, an in-popup clarification answer flow, a real Sign in with Microsoft
+flow, and a background poll that notifies on two kinds of change: a new clarification question, and
+an item marked fixed/unsolved. Everything past this section is the original design spec this build
+started from — still accurate as the target shape, kept as-is rather than rewritten now.
 
 ### First-run onboarding (no pasted tokens)
 
