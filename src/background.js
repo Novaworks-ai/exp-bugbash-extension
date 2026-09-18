@@ -142,8 +142,8 @@ async function applyConsoleCaptureScript() {
   ]);
 }
 
-// Pin/Unpin (header button): whether clicking the toolbar icon opens the
-// popup (default) or this same page as a side panel instead --
+// Display mode (Settings tab button): whether clicking the toolbar icon opens
+// this page as a side panel (default) or a popup instead --
 // chrome.sidePanel.setPanelBehavior is a stored, global preference, not
 // per-tab state, so this just mirrors settings.uiMode into it. Actually
 // opening the side panel the first time (a real user gesture, done from

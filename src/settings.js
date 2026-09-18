@@ -27,11 +27,11 @@ const DEFAULTS = {
   // that site, so the intake service can grep its logs for it.
   traceId: "",
 
-  // "popup" (default) or "sidepanel" -- see background.js's
+  // "sidepanel" (default) or "popup" -- see background.js's
   // applySidePanelBehavior(), which mirrors this into
   // chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick }). Toggled
-  // via the Settings tab's Pin/Unpin button.
-  uiMode: "popup",
+  // via the Settings tab's "Display mode" button.
+  uiMode: "sidepanel",
 
   // Whether the filer has dismissed the "test scope" (focus areas) banner
   // on #panel-main -- see popup.js's refreshFocusAreas(). Persisted so it

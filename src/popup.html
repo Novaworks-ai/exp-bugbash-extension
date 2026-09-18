@@ -17,7 +17,6 @@
     <div class="connect-status hidden" id="connect-status">
       <span class="dot dot-off" id="connect-dot"></span>
       <span id="connect-label">Not connected</span>
-      <button class="pin-btn" id="btn-toggle-ui-mode" title="Pin as side panel"></button>
       <button class="pin-btn" id="btn-open-history" title="History">🕘</button>
       <button class="pin-btn" id="btn-open-settings" title="Settings">⚙️</button>
     </div>
@@ -161,6 +160,14 @@
           <button class="secondary-btn" id="btn-change-service">Change service</button>
         </div>
         <div class="status hidden" id="settings-status"></div>
+
+        <div class="divider"></div>
+
+        <label class="field-label">Display mode</label>
+        <p class="hint" id="settings-ui-mode-description"></p>
+        <div class="row">
+          <button class="secondary-btn" id="btn-toggle-ui-mode"></button>
+        </div>
 
         <div class="divider"></div>
 

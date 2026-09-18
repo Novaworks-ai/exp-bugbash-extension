@@ -206,7 +206,6 @@ async function refreshConnectBadge() {
   const dot = $("connect-dot");
   const label = $("connect-label");
   status.classList.remove("hidden");
-  refreshUiModeControls(settings.uiMode);
 
   if (!isConnected(settings)) {
     dot.className = "dot dot-off";
@@ -231,6 +230,7 @@ async function refreshSettingsPanel() {
     : "Signed in with Microsoft Entra ID.";
   $("btn-sign-out").classList.toggle("hidden", settings.authDisabled);
   $("settings-target-app-url").value = settings.targetAppUrl || "";
+  refreshUiModeControls(settings.uiMode);
 
   const stored = await chrome.storage.local.get(PENDING_TARGET_APP_URL_KEY);
   const pendingUrl = stored[PENDING_TARGET_APP_URL_KEY];
@@ -251,12 +251,13 @@ async function refreshSettingsPanel() {
 
 function refreshUiModeControls(uiMode) {
   const btn = $("btn-toggle-ui-mode");
+  const desc = $("settings-ui-mode-description");
   if (uiMode === "sidepanel") {
-    btn.textContent = "📌";
-    btn.title = "Pinned as a side panel — click to switch back to a popup";
+    btn.textContent = "Switch to popup";
+    desc.textContent = "The toolbar icon currently opens this as a side panel, pinned open alongside the page.";
   } else {
-    btn.textContent = "📍";
-    btn.title = "Currently a popup — click to pin as a side panel";
+    btn.textContent = "Switch to side panel";
+    desc.textContent = "The toolbar icon currently opens this as a popup, which closes as soon as it loses focus.";
   }
 }
 
