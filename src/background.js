@@ -134,7 +134,7 @@ async function applyConsoleCaptureScript() {
     {
       id: CONSOLE_CAPTURE_SCRIPT_ID,
       matches: [pattern],
-      js: ["console-capture.js"],
+      js: ["src/console-capture.js"],
       world: "MAIN",
       runAt: "document_start",
       allFrames: true,
