@@ -652,6 +652,28 @@ async function openAnnotateWindow(shot, pin) {
   });
 }
 
+// pin-picker.js's cleanup() removes the hint banner and hover highlight
+// synchronously on click, but a DOM mutation doesn't force an immediate
+// repaint -- confirmed live: captureVisibleTab fired fast enough after
+// cleanup() that the hint banner ("Click the element...") was still baked
+// into the screenshot, the browser hadn't actually repainted without it
+// yet. Waiting for two consecutive requestAnimationFrame callbacks in the
+// tab's own top frame guarantees at least one real paint has happened
+// since the mutation (the first rAF fires before the *next* paint, so it's
+// still the frame with the highlight/hint still visible; the second one is
+// after it's actually gone). Best-effort: if this fails for any reason,
+// fall through and screenshot anyway rather than blocking the capture.
+async function waitForRepaint(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    });
+  } catch (_) {
+    // best-effort
+  }
+}
+
 async function handlePinCaptureClick() {
   const statusEl = $("capture-status");
   hideStatus(statusEl);
@@ -663,6 +685,7 @@ async function handlePinCaptureClick() {
       showStatus(statusEl, "Pin cancelled.", "info");
       return;
     }
+    await waitForRepaint(tab.id);
     const shot = await takeScreenshot();
 
     // Best-effort, same as the plain "Capture" flow -- only returns
