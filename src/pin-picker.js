@@ -23,24 +23,32 @@
   let lastTargetPrevOutline = "";
   let lastTargetPrevOffset = "";
 
-  const hint = document.createElement("div");
-  hint.id = HINT_ID;
-  hint.textContent = "Click the element your report is about — Esc to cancel";
-  Object.assign(hint.style, {
-    position: "fixed",
-    top: "12px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    zIndex: "2147483647",
-    background: "#181611",
-    color: "#fff",
-    font: "13px -apple-system, sans-serif",
-    padding: "6px 14px",
-    borderRadius: "999px",
-    pointerEvents: "none",
-    boxShadow: "0 2px 10px rgba(0,0,0,.3)",
-  });
-  document.documentElement.appendChild(hint);
+  // Injected into every frame (see injectPinPicker's allFrames: true in
+  // popup.js) since the real content on a page like ServiceNow's classic UI
+  // lives inside an iframe, not the top frame -- but only the top frame
+  // should show the "click here" hint banner, or a page with nested frames
+  // would show one overlapping banner per frame.
+  let hint = null;
+  if (window.top === window) {
+    hint = document.createElement("div");
+    hint.id = HINT_ID;
+    hint.textContent = "Click the element your report is about — Esc to cancel";
+    Object.assign(hint.style, {
+      position: "fixed",
+      top: "12px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: "2147483647",
+      background: "#181611",
+      color: "#fff",
+      font: "13px -apple-system, sans-serif",
+      padding: "6px 14px",
+      borderRadius: "999px",
+      pointerEvents: "none",
+      boxShadow: "0 2px 10px rgba(0,0,0,.3)",
+    });
+    document.documentElement.appendChild(hint);
+  }
   document.documentElement.style.cursor = "crosshair";
 
   function clearHighlight() {
@@ -90,7 +98,7 @@
 
   function cleanup() {
     clearHighlight();
-    hint.remove();
+    if (hint) hint.remove();
     document.documentElement.style.cursor = "";
     document.removeEventListener("mousemove", onMouseMove, true);
     document.removeEventListener("click", onClick, true);

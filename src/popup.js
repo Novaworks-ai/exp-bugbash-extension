@@ -561,9 +561,18 @@ chrome.runtime.onMessage.addListener((message) => {
 // token -- but requesting "<all_urls>" (requestCapturePermission, already
 // used below for the screenshot step) covers every case in one prompt
 // rather than asking again per-origin.
+// allFrames -- a page like ServiceNow's classic UI renders the actual
+// content inside an iframe (gsft_main), not the top frame; without this,
+// pin-picker.js's listeners only ever exist in a frame the filer never
+// clicks in, and nothing happens on click. Confirmed live. Each frame gets
+// its own copy of the script and sets up its own listeners independently;
+// only the one actually clicked ever sends a message back (see
+// pin-picker.js's window.top guard on the hint banner, so nested frames
+// don't each draw their own overlapping "click here" banner).
 async function injectPinPicker(tabId) {
+  const opts = { target: { tabId, allFrames: true }, files: ["src/pin-picker.js"] };
   try {
-    await chrome.scripting.executeScript({ target: { tabId }, files: ["src/pin-picker.js"] });
+    await chrome.scripting.executeScript(opts);
   } catch (err) {
     let granted = false;
     try {
@@ -572,7 +581,7 @@ async function injectPinPicker(tabId) {
       granted = false;
     }
     if (!granted) throw new Error(`${err.message} Allow access to this page and try again.`);
-    await chrome.scripting.executeScript({ target: { tabId }, files: ["src/pin-picker.js"] });
+    await chrome.scripting.executeScript(opts);
   }
 }
 
