@@ -68,16 +68,14 @@
 
         <div id="capture-idle">
           <div class="row">
-            <button class="primary-btn" id="btn-capture">Capture this page</button>
-            <button class="secondary-btn" id="btn-upload-screenshot-idle">Upload a screenshot…</button>
-          </div>
-          <p class="hint">
-            Grabs a screenshot of the visible tab, then add a description.
+            <button class="primary-btn" id="btn-capture">Capture</button>
+            <button class="secondary-btn" id="btn-upload-screenshot-idle">Upload</button>
             <!-- Only shown once the "Test scope" banner above has been
                  dismissed (see refreshFocusAreas/handleShowTestScope in
                  popup.js) -- otherwise there'd be no reason to show it. -->
             <button class="icon-btn hidden" id="btn-show-test-scope" title="Show test scope / bug bash info again">ⓘ</button>
-          </p>
+          </div>
+          <p class="hint">Grabs a screenshot of the visible tab, then add a description.</p>
           <button class="link-btn" id="btn-text-only">Nothing to screenshot? File a text-only report</button>
         </div>
 

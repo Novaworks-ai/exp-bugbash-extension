@@ -315,17 +315,28 @@ body.side-panel .panels {
   padding: 0;
 }
 
-/* Small inline icon button -- currently only "reopen the dismissed Test
-   scope banner" (btn-show-test-scope), next to the capture-idle hint text. */
+/* Small square icon button -- currently only "reopen the dismissed Test
+   scope banner" (btn-show-test-scope), sitting in a .row next to the other
+   capture-idle buttons. Sized/bordered like .secondary-btn but fixed-width
+   (see the .row > button override below) since it holds a single glyph. */
 .icon-btn {
-  background: none;
-  border: none;
-  color: var(--brand);
-  font-size: 13px;
-  cursor: pointer;
+  background: var(--bg-muted);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 15px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
-  margin-left: 2px;
-  vertical-align: middle;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: #eaeaf0;
 }
 
 .row {
@@ -336,6 +347,10 @@ body.side-panel .panels {
 
 .row > button {
   flex: 1;
+}
+
+.row > button.icon-btn {
+  flex: none;
 }
 
 .hint {
