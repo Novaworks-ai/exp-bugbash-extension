@@ -480,7 +480,6 @@ function resetCaptureForm() {
   $("repro-steps").value = "";
   $("additional-info").value = "";
   $("capture-idle").classList.remove("hidden");
-  $("capture-annotate").classList.add("hidden");
   $("capture-preview").classList.add("hidden");
   hideStatus($("capture-status"));
   $("screenshot-upload-input").value = "";
@@ -534,10 +533,15 @@ function renderConsoleErrorsHint() {
 // that triggers this is the only caller), so a single module-level resolver
 // is enough -- no per-call correlation id needed.
 let pinPickResolve = null;
+// Set by openAnnotateWindow while its window is open -- resolves to
+// { dataUrl } on "Use this", or null on cancel/close (either the explicit
+// Cancel button's message, or chrome.windows.onRemoved below catching the
+// filer closing the window with the OS close button instead).
+let annotateResolve = null;
+let annotateWindowId = null;
 
 chrome.runtime.onMessage.addListener((message) => {
-  if (!pinPickResolve) return;
-  if (message?.type === "bugbash-pin-picked") {
+  if (pinPickResolve && message?.type === "bugbash-pin-picked") {
     pinPickResolve({
       selector: message.selector,
       point: message.point,
@@ -545,9 +549,25 @@ chrome.runtime.onMessage.addListener((message) => {
       devicePixelRatio: message.devicePixelRatio,
     });
     pinPickResolve = null;
-  } else if (message?.type === "bugbash-pin-cancelled") {
+  } else if (pinPickResolve && message?.type === "bugbash-pin-cancelled") {
     pinPickResolve(null);
     pinPickResolve = null;
+  } else if (annotateResolve && message?.type === "bugbash-annotate-done") {
+    annotateResolve({ dataUrl: message.dataUrl });
+    annotateResolve = null;
+    annotateWindowId = null;
+  } else if (annotateResolve && message?.type === "bugbash-annotate-cancelled") {
+    annotateResolve(null);
+    annotateResolve = null;
+    annotateWindowId = null;
+  }
+});
+
+chrome.windows.onRemoved.addListener((windowId) => {
+  if (windowId === annotateWindowId && annotateResolve) {
+    annotateResolve(null);
+    annotateResolve = null;
+    annotateWindowId = null;
   }
 });
 
@@ -595,119 +615,41 @@ async function pickElementOnPage(tabId) {
   });
 }
 
-// Renders shot.dataUrl into #annotate-canvas at its full (device-pixel-ratio
-// scaled) resolution -- matching captureVisibleTab's own output -- draws a
-// pin marker at pin.point (which is in CSS pixels, i.e. devicePixelRatio
-// smaller than the canvas' own coordinate space), and wires up freehand
-// drawing on top. baseImageData is the image+pin flattened together, kept
-// around so "Clear drawing" can restore exactly that instead of erasing the
-// pin along with the filer's own strokes.
-let annotateCtx = null;
-let annotateBaseImageData = null;
-let annotateDrawing = false;
-let currentPin = null; // { selector, point, rect, devicePixelRatio } for the in-progress annotate step
+// Opens src/annotate.html as its own real browser window rather than a step
+// inside this panel -- the side panel/popup can be as narrow as ~350px,
+// unusable for freehand drawing, the same reason the Entra sign-in flow
+// gets a real window instead of running inline. A screenshot's data URL is
+// too big for a URL query param, so the handoff goes through
+// chrome.storage.session (annotate.js reads and clears it on load) instead.
+// Resolves with { dataUrl } from "Use this", or null if the filer cancels
+// or just closes the window.
+async function openAnnotateWindow(shot, pin) {
+  await chrome.storage.session.set({ bugbashPendingAnnotate: { dataUrl: shot.dataUrl, pin } });
 
-function annotateCanvasScale() {
-  const canvas = $("annotate-canvas");
-  return canvas.width / canvas.getBoundingClientRect().width;
-}
-
-function annotatePointerPos(e) {
-  const canvas = $("annotate-canvas");
-  const rect = canvas.getBoundingClientRect();
-  const scale = annotateCanvasScale();
-  return { x: (e.clientX - rect.left) * scale, y: (e.clientY - rect.top) * scale };
-}
-
-function onAnnotatePointerDown(e) {
-  annotateDrawing = true;
-  const { x, y } = annotatePointerPos(e);
-  annotateCtx.beginPath();
-  annotateCtx.moveTo(x, y);
-}
-
-function onAnnotatePointerMove(e) {
-  if (!annotateDrawing) return;
-  const { x, y } = annotatePointerPos(e);
-  annotateCtx.lineTo(x, y);
-  annotateCtx.stroke();
-}
-
-function onAnnotatePointerUp() {
-  annotateDrawing = false;
-}
-
-async function openAnnotateStep(shot, pin) {
-  const canvas = $("annotate-canvas");
-  const img = new Image();
-  await new Promise((resolve, reject) => {
-    img.onload = resolve;
-    img.onerror = () => reject(new Error("Couldn't load the screenshot for annotating."));
-    img.src = shot.dataUrl;
-  });
-
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  annotateCtx = canvas.getContext("2d");
-  annotateCtx.drawImage(img, 0, 0);
-
-  if (pin) {
-    const dpr = pin.devicePixelRatio || 1;
-    const px = pin.point.x * dpr;
-    const py = pin.point.y * dpr;
-    annotateCtx.save();
-    annotateCtx.strokeStyle = "#e8823f";
-    annotateCtx.fillStyle = "#e8823f";
-    annotateCtx.lineWidth = 3 * dpr;
-    annotateCtx.beginPath();
-    annotateCtx.arc(px, py, 14 * dpr, 0, Math.PI * 2);
-    annotateCtx.stroke();
-    annotateCtx.beginPath();
-    annotateCtx.arc(px, py, 3 * dpr, 0, Math.PI * 2);
-    annotateCtx.fill();
-    annotateCtx.restore();
+  const width = 1000;
+  const height = 820;
+  let left;
+  let top;
+  try {
+    left = Math.max(0, Math.round((window.screen.availWidth - width) / 2));
+    top = Math.max(0, Math.round((window.screen.availHeight - height) / 2));
+  } catch (_) {
+    left = undefined;
+    top = undefined;
   }
 
-  annotateBaseImageData = annotateCtx.getImageData(0, 0, canvas.width, canvas.height);
-  annotateCtx.strokeStyle = "#d92d20";
-  annotateCtx.lineWidth = 4;
-  annotateCtx.lineCap = "round";
-  annotateCtx.lineJoin = "round";
-
-  currentPin = pin;
-  $("annotate-selector").textContent = pin ? pin.selector : "(none)";
-  $("capture-idle").classList.add("hidden");
-  $("capture-annotate").classList.remove("hidden");
-}
-
-function handleAnnotateClear() {
-  if (!annotateCtx || !annotateBaseImageData) return;
-  annotateCtx.putImageData(annotateBaseImageData, 0, 0);
-}
-
-function handleAnnotateCancel() {
-  annotateCtx = null;
-  annotateBaseImageData = null;
-  currentPin = null;
-  $("capture-annotate").classList.add("hidden");
-  $("capture-idle").classList.remove("hidden");
-}
-
-async function handleAnnotateUse() {
-  const canvas = $("annotate-canvas");
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-  const dataUrl = canvas.toDataURL("image/png");
-  currentScreenshots[0] = { dataUrl, blob };
-  currentElementSelector = currentPin ? currentPin.selector : null;
-  annotateCtx = null;
-  annotateBaseImageData = null;
-  currentPin = null;
-
-  syncMediaPreview();
-  renderPageMeta();
-  $("capture-annotate").classList.add("hidden");
-  $("capture-preview").classList.remove("hidden");
-  renderScreenshotThumbs();
+  return new Promise((resolve, reject) => {
+    annotateResolve = resolve;
+    chrome.windows
+      .create({ url: chrome.runtime.getURL("src/annotate.html"), type: "popup", width, height, left, top })
+      .then((win) => {
+        annotateWindowId = win.id;
+      })
+      .catch((err) => {
+        annotateResolve = null;
+        reject(err);
+      });
+  });
 }
 
 async function handlePinCaptureClick() {
@@ -722,12 +664,27 @@ async function handlePinCaptureClick() {
       return;
     }
     const shot = await takeScreenshot();
-    await openAnnotateStep(shot, pin);
 
     // Best-effort, same as the plain "Capture" flow -- only returns
     // anything if this tab's origin is the filer's configured Target app.
     currentConsoleErrors = await fetchConsoleErrors(shot.tabId);
     renderConsoleErrorsHint();
+
+    showStatus(statusEl, "Draw on the screenshot in the window that just opened…", "info");
+    const result = await openAnnotateWindow(shot, pin);
+    if (!result) {
+      hideStatus(statusEl);
+      return; // stays on the idle screen -- nothing was captured into the form
+    }
+
+    currentScreenshots[0] = { dataUrl: result.dataUrl, blob: await dataUrlToBlob(result.dataUrl) };
+    currentElementSelector = pin.selector;
+    syncMediaPreview();
+    renderPageMeta();
+    hideStatus(statusEl);
+    $("capture-idle").classList.add("hidden");
+    $("capture-preview").classList.remove("hidden");
+    renderScreenshotThumbs();
   } catch (err) {
     showStatus(statusEl, `Couldn't pin & capture: ${err.message}`, "error");
   }
@@ -1355,12 +1312,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 function wireUp() {
   $("btn-pin-capture").addEventListener("click", handlePinCaptureClick);
-  $("btn-annotate-clear").addEventListener("click", handleAnnotateClear);
-  $("btn-annotate-cancel").addEventListener("click", handleAnnotateCancel);
-  $("btn-annotate-use").addEventListener("click", handleAnnotateUse);
-  $("annotate-canvas").addEventListener("pointerdown", onAnnotatePointerDown);
-  $("annotate-canvas").addEventListener("pointermove", onAnnotatePointerMove);
-  window.addEventListener("pointerup", onAnnotatePointerUp);
   $("btn-capture").addEventListener("click", handleCaptureClick);
   $("btn-retake").addEventListener("click", handleCaptureClick);
   $("btn-add-screenshot").addEventListener("click", handleAddScreenshotClick);

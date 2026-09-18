@@ -84,23 +84,6 @@
           <button class="link-btn" id="btn-text-only">Nothing to screenshot? File a text-only report</button>
         </div>
 
-        <!-- Shown between "Pin & Capture" and the description form: the
-             screenshot loaded into a canvas, pin marker already drawn on it,
-             the filer can draw further before moving on. See
-             openAnnotateStep/handlePinCaptureClick in popup.js. -->
-        <div id="capture-annotate" class="hidden">
-          <div class="annotate-canvas-wrap">
-            <canvas id="annotate-canvas"></canvas>
-          </div>
-          <p class="hint">Pinned element: <code id="annotate-selector"></code></p>
-          <p class="hint">Draw on the screenshot to point out anything else worth noting.</p>
-          <div class="row">
-            <button class="secondary-btn" id="btn-annotate-clear">Clear drawing</button>
-            <button class="secondary-btn" id="btn-annotate-cancel">Cancel</button>
-            <button class="primary-btn" id="btn-annotate-use">Use this</button>
-          </div>
-        </div>
-
         <div id="capture-preview" class="hidden capture-grid">
           <div class="capture-col-media">
             <img id="preview-img" alt="Screenshot preview" />
@@ -122,10 +105,16 @@
             <textarea id="repro-steps" rows="4" placeholder="1. Click X...&#10;2. Navigate to Y..."></textarea>
             <label class="field-label" for="additional-info">Additional information</label>
             <textarea id="additional-info" rows="4" placeholder="What did you expect to happen instead? Anything else worth noting?"></textarea>
-            <div class="row">
-              <button class="secondary-btn" id="btn-cancel-capture">Cancel</button>
-              <button class="primary-btn" id="btn-submit">Submit</button>
-            </div>
+          </div>
+          <!-- Spans both columns (see .capture-actions in popup.css) -- the
+               media column is usually shorter than the form column, so
+               nesting this inside capture-col-form left it landing wherever
+               that column's own content happened to end, colliding visually
+               with the media column's own (unrelated) button row instead of
+               reading as one clear final action bar. -->
+          <div class="row capture-actions">
+            <button class="secondary-btn" id="btn-cancel-capture">Cancel</button>
+            <button class="primary-btn" id="btn-submit">Submit</button>
           </div>
         </div>
 
