@@ -563,9 +563,18 @@ async function handleSubmitClick() {
       pageUrl: currentPage.url,
       pageTitle: currentPage.title,
     });
-    showStatus(statusEl, `Submitted (id: ${result.id}). See it in the queue below.`, "ok");
-    setTimeout(resetCaptureForm, 1500);
-    await refreshQueue();
+    if (result.duplicate_of) {
+      showStatus(
+        statusEl,
+        `Already tracked — this bug was filed before (${result.duplicate_of.slice(0, 8)}…). No action needed.`,
+        "info",
+      );
+      setTimeout(resetCaptureForm, 3000);
+    } else {
+      showStatus(statusEl, `Submitted (id: ${result.id}). See it in the queue below.`, "ok");
+      setTimeout(resetCaptureForm, 1500);
+      await refreshQueue();
+    }
   } catch (err) {
     showStatus(statusEl, `Submit failed: ${err.message}`, "error");
   } finally {
