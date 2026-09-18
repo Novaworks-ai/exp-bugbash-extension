@@ -182,6 +182,13 @@ body.side-panel .panels {
   gap: 16px;
 }
 
+.capture-actions {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
 /* A side panel can be narrower than the two-column layout needs -- stack
    instead of squeezing the screenshot column. */
 @media (max-width: 520px) {
@@ -398,6 +405,7 @@ textarea:focus {
   border: 1px solid var(--border);
   margin-bottom: 6px;
 }
+
 
 .page-meta {
   font-size: 11px;

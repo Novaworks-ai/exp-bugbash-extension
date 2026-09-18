@@ -7,6 +7,10 @@ let currentConsoleErrors = []; // [{ level, message, timestamp }, ...] -- see fe
 // always about the current page, so it never applies there). Reset in
 // takeScreenshot() / handleScreenshotUploadChange() / handleTextOnlyClick().
 let pageMetaOptional = false;
+// Set by the "Pin & Capture" flow only (pin-picker.js's selector for
+// whatever element the filer clicked) -- folded into the description on
+// submit (buildDescription) and cleared by resetCaptureForm.
+let currentElementSelector = null;
 
 function $(id) {
   return document.getElementById(id);
@@ -480,6 +484,7 @@ function resetCaptureForm() {
   hideStatus($("capture-status"));
   $("screenshot-upload-input").value = "";
   currentScreenshots = [];
+  currentElementSelector = null;
   renderScreenshotThumbs();
   syncMediaPreview();
   currentPage = null;
@@ -518,9 +523,203 @@ function renderConsoleErrorsHint() {
   }
 }
 
+// ---------------------------------------------------------------------
+// Pin & Capture
+// ---------------------------------------------------------------------
+
+// Injects pin-picker.js into the active tab and resolves with
+// { selector, point, rect } once the filer clicks an element, or null if
+// they press Escape. Only one picker session runs at a time (the button
+// that triggers this is the only caller), so a single module-level resolver
+// is enough -- no per-call correlation id needed.
+let pinPickResolve = null;
+// Set by openAnnotateWindow while its window is open -- resolves to
+// { dataUrl } on "Use this", or null on cancel/close (either the explicit
+// Cancel button's message, or chrome.windows.onRemoved below catching the
+// filer closing the window with the OS close button instead).
+let annotateResolve = null;
+let annotateWindowId = null;
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (pinPickResolve && message?.type === "bugbash-pin-picked") {
+    pinPickResolve({
+      selector: message.selector,
+      point: message.point,
+      rect: message.rect,
+      devicePixelRatio: message.devicePixelRatio,
+    });
+    pinPickResolve = null;
+  } else if (pinPickResolve && message?.type === "bugbash-pin-cancelled") {
+    pinPickResolve(null);
+    pinPickResolve = null;
+  } else if (annotateResolve && message?.type === "bugbash-annotate-done") {
+    annotateResolve({ dataUrl: message.dataUrl });
+    annotateResolve = null;
+    annotateWindowId = null;
+  } else if (annotateResolve && message?.type === "bugbash-annotate-cancelled") {
+    annotateResolve(null);
+    annotateResolve = null;
+    annotateWindowId = null;
+  }
+});
+
+chrome.windows.onRemoved.addListener((windowId) => {
+  if (windowId === annotateWindowId && annotateResolve) {
+    annotateResolve(null);
+    annotateResolve = null;
+    annotateWindowId = null;
+  }
+});
+
+// Same activeTab-permission gap as takeScreenshot() below -- executeScript
+// needs a host permission covering this tab's URL, and activeTab alone
+// often isn't enough (a side panel's activeTab grant, in particular, is
+// pinned to whichever tab was active when the panel first opened, not
+// necessarily the one showing now). Unlike captureVisibleTab,
+// executeScript's own permission check is satisfied by any granted host
+// pattern that covers the URL, not specifically the literal "<all_urls>"
+// token -- but requesting "<all_urls>" (requestCapturePermission, already
+// used below for the screenshot step) covers every case in one prompt
+// rather than asking again per-origin.
+// allFrames -- a page like ServiceNow's classic UI renders the actual
+// content inside an iframe (gsft_main), not the top frame; without this,
+// pin-picker.js's listeners only ever exist in a frame the filer never
+// clicks in, and nothing happens on click. Confirmed live. Each frame gets
+// its own copy of the script and sets up its own listeners independently;
+// only the one actually clicked ever sends a message back (see
+// pin-picker.js's window.top guard on the hint banner, so nested frames
+// don't each draw their own overlapping "click here" banner).
+async function injectPinPicker(tabId) {
+  const opts = { target: { tabId, allFrames: true }, files: ["src/pin-picker.js"] };
+  try {
+    await chrome.scripting.executeScript(opts);
+  } catch (err) {
+    let granted = false;
+    try {
+      granted = await requestCapturePermission();
+    } catch (_) {
+      granted = false;
+    }
+    if (!granted) throw new Error(`${err.message} Allow access to this page and try again.`);
+    await chrome.scripting.executeScript(opts);
+  }
+}
+
+async function pickElementOnPage(tabId) {
+  return new Promise((resolve, reject) => {
+    pinPickResolve = resolve;
+    injectPinPicker(tabId).catch((err) => {
+      pinPickResolve = null;
+      reject(err);
+    });
+  });
+}
+
+// Opens src/annotate.html as its own real browser window rather than a step
+// inside this panel -- the side panel/popup can be as narrow as ~350px,
+// unusable for freehand drawing, the same reason the Entra sign-in flow
+// gets a real window instead of running inline. A screenshot's data URL is
+// too big for a URL query param, so the handoff goes through
+// chrome.storage.session (annotate.js reads and clears it on load) instead.
+// Resolves with { dataUrl } from "Use this", or null if the filer cancels
+// or just closes the window.
+async function openAnnotateWindow(shot, pin) {
+  await chrome.storage.session.set({ bugbashPendingAnnotate: { dataUrl: shot.dataUrl, pin } });
+
+  const width = 1000;
+  const height = 820;
+  let left;
+  let top;
+  try {
+    left = Math.max(0, Math.round((window.screen.availWidth - width) / 2));
+    top = Math.max(0, Math.round((window.screen.availHeight - height) / 2));
+  } catch (_) {
+    left = undefined;
+    top = undefined;
+  }
+
+  return new Promise((resolve, reject) => {
+    annotateResolve = resolve;
+    chrome.windows
+      .create({ url: chrome.runtime.getURL("src/annotate.html"), type: "popup", width, height, left, top })
+      .then((win) => {
+        annotateWindowId = win.id;
+      })
+      .catch((err) => {
+        annotateResolve = null;
+        reject(err);
+      });
+  });
+}
+
+// pin-picker.js's cleanup() removes the hint banner and hover highlight
+// synchronously on click, but a DOM mutation doesn't force an immediate
+// repaint -- confirmed live: captureVisibleTab fired fast enough after
+// cleanup() that the hint banner ("Click the element...") was still baked
+// into the screenshot, the browser hadn't actually repainted without it
+// yet. Waiting for two consecutive requestAnimationFrame callbacks in the
+// tab's own top frame guarantees at least one real paint has happened
+// since the mutation (the first rAF fires before the *next* paint, so it's
+// still the frame with the highlight/hint still visible; the second one is
+// after it's actually gone). Best-effort: if this fails for any reason,
+// fall through and screenshot anyway rather than blocking the capture.
+async function waitForRepaint(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    });
+  } catch (_) {
+    // best-effort
+  }
+}
+
+async function handlePinCaptureClick() {
+  const statusEl = $("capture-status");
+  hideStatus(statusEl);
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) throw new Error("No active tab found.");
+    const pin = await pickElementOnPage(tab.id);
+    if (!pin) {
+      showStatus(statusEl, "Pin cancelled.", "info");
+      return;
+    }
+    await waitForRepaint(tab.id);
+    const shot = await takeScreenshot();
+
+    // Best-effort, same as the plain "Capture" flow -- only returns
+    // anything if this tab's origin is the filer's configured Target app.
+    currentConsoleErrors = await fetchConsoleErrors(shot.tabId);
+    renderConsoleErrorsHint();
+
+    showStatus(statusEl, "Draw on the screenshot in the window that just opened…", "info");
+    const result = await openAnnotateWindow(shot, pin);
+    if (!result) {
+      hideStatus(statusEl);
+      return; // stays on the idle screen -- nothing was captured into the form
+    }
+
+    currentScreenshots[0] = { dataUrl: result.dataUrl, blob: await dataUrlToBlob(result.dataUrl) };
+    currentElementSelector = pin.selector;
+    syncMediaPreview();
+    renderPageMeta();
+    hideStatus(statusEl);
+    $("capture-idle").classList.add("hidden");
+    $("capture-preview").classList.remove("hidden");
+    renderScreenshotThumbs();
+  } catch (err) {
+    showStatus(statusEl, `Couldn't pin & capture: ${err.message}`, "error");
+  }
+}
+
 async function handleCaptureClick() {
   const statusEl = $("capture-status");
   hideStatus(statusEl);
+  // A plain "Capture"/"Retake" screenshot has no relationship to whatever
+  // element a prior "Pin & Capture" pinned -- don't leave a stale selector
+  // in the eventual description.
+  currentElementSelector = null;
   try {
     const shot = await takeScreenshot();
     currentScreenshots[0] = shot;
@@ -620,6 +819,9 @@ function buildDescription() {
   const sections = [];
   if (repro) sections.push(`Steps to reproduce:\n${repro}`);
   if (additional) sections.push(`Additional information:\n${additional}`);
+  if (currentElementSelector) {
+    sections.push(`Pinned element (CSS selector): ${currentElementSelector}`);
+  }
   if (currentConsoleErrors.length) {
     const formatted = currentConsoleErrors.map((e) => `[${e.level}] ${e.message}`).join("\n");
     sections.push(`Console errors (auto-captured):\n${formatted}`);
@@ -1132,6 +1334,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // ---------------------------------------------------------------------
 
 function wireUp() {
+  $("btn-pin-capture").addEventListener("click", handlePinCaptureClick);
   $("btn-capture").addEventListener("click", handleCaptureClick);
   $("btn-retake").addEventListener("click", handleCaptureClick);
   $("btn-add-screenshot").addEventListener("click", handleAddScreenshotClick);

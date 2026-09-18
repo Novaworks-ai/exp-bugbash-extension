@@ -68,14 +68,19 @@
 
         <div id="capture-idle">
           <div class="row">
-            <button class="primary-btn" id="btn-capture">Capture</button>
+            <button class="primary-btn" id="btn-pin-capture">Pin &amp; Capture</button>
+            <button class="secondary-btn" id="btn-capture">Capture</button>
             <button class="secondary-btn" id="btn-upload-screenshot-idle">Upload</button>
             <!-- Only shown once the "Test scope" banner above has been
                  dismissed (see refreshFocusAreas/handleShowTestScope in
                  popup.js) -- otherwise there'd be no reason to show it. -->
             <button class="icon-btn hidden" id="btn-show-test-scope" title="Show test scope / bug bash info again">ⓘ</button>
           </div>
-          <p class="hint">Grabs a screenshot of the visible tab, then add a description.</p>
+          <p class="hint">
+            <strong>Pin &amp; Capture</strong> lets you click the exact element your report is
+            about, then draw on the screenshot. <strong>Capture</strong> just grabs the visible
+            tab as-is.
+          </p>
           <button class="link-btn" id="btn-text-only">Nothing to screenshot? File a text-only report</button>
         </div>
 
@@ -100,10 +105,16 @@
             <textarea id="repro-steps" rows="4" placeholder="1. Click X...&#10;2. Navigate to Y..."></textarea>
             <label class="field-label" for="additional-info">Additional information</label>
             <textarea id="additional-info" rows="4" placeholder="What did you expect to happen instead? Anything else worth noting?"></textarea>
-            <div class="row">
-              <button class="secondary-btn" id="btn-cancel-capture">Cancel</button>
-              <button class="primary-btn" id="btn-submit">Submit</button>
-            </div>
+          </div>
+          <!-- Spans both columns (see .capture-actions in popup.css) -- the
+               media column is usually shorter than the form column, so
+               nesting this inside capture-col-form left it landing wherever
+               that column's own content happened to end, colliding visually
+               with the media column's own (unrelated) button row instead of
+               reading as one clear final action bar. -->
+          <div class="row capture-actions">
+            <button class="secondary-btn" id="btn-cancel-capture">Cancel</button>
+            <button class="primary-btn" id="btn-submit">Submit</button>
           </div>
         </div>
 
