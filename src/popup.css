@@ -561,10 +561,10 @@ textarea:focus {
   font-size: 11px;
   line-height: 1;
   flex-shrink: 0;
-  padding: 1px 6px;
+  padding: 4px 3px;
   border-radius: 8px;
-  background: #e6eaff;
-  color: var(--brand-dark);
+  background: var(--brand);
+  color: #fff;
 }
 
 .badge {
