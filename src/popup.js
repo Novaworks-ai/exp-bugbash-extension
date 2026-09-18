@@ -921,7 +921,7 @@ function reportTypeTag(item) {
   const emoji = REPORT_TYPE_EMOJI[item.report_type];
   if (!emoji) return null;
   const span = document.createElement("span");
-  span.className = "report-type-emoji";
+  span.className = "report-type-tag";
   span.textContent = emoji;
   span.title = REPORT_TYPE_LABEL[item.report_type] || item.report_type;
   return span;
@@ -990,10 +990,10 @@ function renderItemList(listEl, emptyEl, items, presence) {
     badges.className = "item-badges";
     const dot = presenceDot(item, presence);
     if (dot) badges.appendChild(dot);
-    const reportType = reportTypeTag(item);
-    if (reportType) badges.appendChild(reportType);
     badges.appendChild(focusAreaTag(item));
     badges.appendChild(statusBadge(displayStatus(item)));
+    const reportType = reportTypeTag(item);
+    if (reportType) badges.appendChild(reportType);
     meta.appendChild(when);
     meta.appendChild(badges);
     li.appendChild(title);
@@ -1027,17 +1027,17 @@ function renderDetail(item) {
   // resolved item shows a stale "ready"/"awaiting-clarification" badge here
   // while the list already shows its terminal resolution (e.g. "duplicate").
   statusRow.appendChild(statusBadge(displayStatus(item)));
-  const reportType = reportTypeTag(item);
-  if (reportType) {
-    reportType.style.marginLeft = "6px";
-    statusRow.appendChild(reportType);
-  }
   if (item.focus_area) {
     const area = document.createElement("span");
     area.className = "hint";
     area.style.marginLeft = "6px";
     area.textContent = `focus: ${item.focus_area} (${item.lane || "unrouted"})`;
     statusRow.appendChild(area);
+  }
+  const reportType = reportTypeTag(item);
+  if (reportType) {
+    reportType.style.marginLeft = "6px";
+    statusRow.appendChild(reportType);
   }
 
   const complexityEl = $("detail-complexity");

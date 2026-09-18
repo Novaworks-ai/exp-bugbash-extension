@@ -557,10 +557,14 @@ textarea:focus {
   background: var(--danger);
 }
 
-.report-type-emoji {
-  font-size: 12px;
+.report-type-tag {
+  font-size: 11px;
   line-height: 1;
   flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: #e6eaff;
+  color: var(--brand-dark);
 }
 
 .badge {
