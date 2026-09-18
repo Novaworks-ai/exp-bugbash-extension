@@ -8,8 +8,9 @@ let currentConsoleErrors = []; // [{ level, message, timestamp }, ...] -- see fe
 // takeScreenshot() / handleScreenshotUploadChange() / handleTextOnlyClick().
 let pageMetaOptional = false;
 // Set by the "Pin & Capture" flow only (pin-picker.js's selector for
-// whatever element the filer clicked) -- folded into the description on
-// submit (buildDescription) and cleared by resetCaptureForm.
+// whatever element the filer clicked) -- sent to the backend as its own
+// `element_selector` form field on submit (see submitCapture), kept out of
+// `description`, and cleared by resetCaptureForm.
 let currentElementSelector = null;
 
 function $(id) {
@@ -813,19 +814,19 @@ async function handleTextOnlyClick() {
 // The intake service's API still takes one `description` string -- these two
 // fields are purely a UI split (to nudge the filer toward what the critique
 // engine actually asks a follow-up question for) and get combined here.
+//
+// Collected/automated metadata (currentElementSelector, currentConsoleErrors)
+// is deliberately NOT folded in here any more -- it isn't the filer's own
+// prose, so mixing it into `description` distorted the word-count-based
+// routing check and confused critique's "is the filer's description
+// understandable" judgment. It's sent to the backend as its own separate
+// form fields instead (see submitCapture / handleSubmitClick).
 function buildDescription() {
   const repro = $("repro-steps").value.trim();
   const additional = $("additional-info").value.trim();
   const sections = [];
   if (repro) sections.push(`Steps to reproduce:\n${repro}`);
   if (additional) sections.push(`Additional information:\n${additional}`);
-  if (currentElementSelector) {
-    sections.push(`Pinned element (CSS selector): ${currentElementSelector}`);
-  }
-  if (currentConsoleErrors.length) {
-    const formatted = currentConsoleErrors.map((e) => `[${e.level}] ${e.message}`).join("\n");
-    sections.push(`Console errors (auto-captured):\n${formatted}`);
-  }
   return sections.join("\n\n");
 }
 
@@ -869,6 +870,8 @@ async function handleSubmitClick() {
       description,
       pageUrl: includePageMeta ? currentPage.url : "",
       pageTitle: includePageMeta ? currentPage.title : "",
+      elementSelector: currentElementSelector,
+      consoleErrors: currentConsoleErrors,
     });
     showStatus(statusEl, `Submitted (id: ${result.id}). See it in the queue below.`, "ok");
     setTimeout(resetCaptureForm, 1500);
