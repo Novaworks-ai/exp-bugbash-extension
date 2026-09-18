@@ -399,6 +399,22 @@ textarea:focus {
   margin-bottom: 6px;
 }
 
+.annotate-canvas-wrap {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  line-height: 0;
+}
+
+#annotate-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  cursor: crosshair;
+  touch-action: none;
+}
+
 .page-meta {
   font-size: 11px;
   color: var(--text-muted);

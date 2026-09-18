@@ -68,15 +68,37 @@
 
         <div id="capture-idle">
           <div class="row">
-            <button class="primary-btn" id="btn-capture">Capture</button>
+            <button class="primary-btn" id="btn-pin-capture">Pin &amp; Capture</button>
+            <button class="secondary-btn" id="btn-capture">Capture</button>
             <button class="secondary-btn" id="btn-upload-screenshot-idle">Upload</button>
             <!-- Only shown once the "Test scope" banner above has been
                  dismissed (see refreshFocusAreas/handleShowTestScope in
                  popup.js) -- otherwise there'd be no reason to show it. -->
             <button class="icon-btn hidden" id="btn-show-test-scope" title="Show test scope / bug bash info again">ⓘ</button>
           </div>
-          <p class="hint">Grabs a screenshot of the visible tab, then add a description.</p>
+          <p class="hint">
+            <strong>Pin &amp; Capture</strong> lets you click the exact element your report is
+            about, then draw on the screenshot. <strong>Capture</strong> just grabs the visible
+            tab as-is.
+          </p>
           <button class="link-btn" id="btn-text-only">Nothing to screenshot? File a text-only report</button>
+        </div>
+
+        <!-- Shown between "Pin & Capture" and the description form: the
+             screenshot loaded into a canvas, pin marker already drawn on it,
+             the filer can draw further before moving on. See
+             openAnnotateStep/handlePinCaptureClick in popup.js. -->
+        <div id="capture-annotate" class="hidden">
+          <div class="annotate-canvas-wrap">
+            <canvas id="annotate-canvas"></canvas>
+          </div>
+          <p class="hint">Pinned element: <code id="annotate-selector"></code></p>
+          <p class="hint">Draw on the screenshot to point out anything else worth noting.</p>
+          <div class="row">
+            <button class="secondary-btn" id="btn-annotate-clear">Clear drawing</button>
+            <button class="secondary-btn" id="btn-annotate-cancel">Cancel</button>
+            <button class="primary-btn" id="btn-annotate-use">Use this</button>
+          </div>
         </div>
 
         <div id="capture-preview" class="hidden capture-grid">
