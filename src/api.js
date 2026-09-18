@@ -52,12 +52,24 @@ async function apiRequest(path, options = {}) {
   return res.json();
 }
 
-async function submitCapture({ blobs, description, pageUrl, pageTitle }) {
+async function submitCapture({ blobs, description, pageUrl, pageTitle, elementSelector, consoleErrors }) {
   const form = new FormData();
   blobs.forEach((blob, i) => form.append("screenshots", blob, `capture-${i}.png`));
   form.append("description", description);
   form.append("page_url", pageUrl);
   form.append("page_title", pageTitle);
+
+  // Collected/automated metadata (Pin & Capture's CSS selector, auto-captured
+  // console errors) is sent as its own fields, separate from `description` --
+  // it's not part of the filer's own prose, so it must not distort word-count
+  // based routing or get conflated with what critique judges as "the filer's
+  // report". See the intake service's own storage.py sidecar-file handling.
+  if (elementSelector) {
+    form.append("element_selector", elementSelector);
+  }
+  if (consoleErrors && consoleErrors.length) {
+    form.append("console_errors", JSON.stringify(consoleErrors));
+  }
 
   // Only sent when a target app is actually configured -- that's the only
   // case background.js's trace-header rule is active, so an unset traceId
