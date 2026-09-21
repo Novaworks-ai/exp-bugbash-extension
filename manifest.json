@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Bug Bash Capture",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzAVz5sh9bnDXXgLGn1fkvGYzPlFapepzYsOmXSftkLiMfd5C4VlyG6DCXjXomWNsY5rN44i7LRaG8ZkCvKHm2TLLjagkAEfiEX+UVyRntA0aNlwzVGaOO3Sl2T2aoqlf+ho7ANJEuvodqU6KS7tgn9WyGvitYaPCQ5y5pu2X5ZaDYCX5ZI+dhDBz3RMPe+qGL6Ohbn6uyyrxEo4GMKdeaxcMx5aG44IHMPeVOxYZ/j+z3Ll6CQHRofFSC+EIn1ncSLfDr14sTWT0y6grYlEIAEgEqEXEQDg95RoukF8DQjmUxYvVUkwLx6VSndWXZGb02z16RXHEiTwwYIWk1VfnGwIDAQAB",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Capture a screenshot + description of a bug during a bug-bash session and send it to a configured intake service.",
   "action": {
     "default_popup": "src/popup.html",
