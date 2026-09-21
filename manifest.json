@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bug Bash Capture",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlpaO64UGplR36htLusu8m8vm+a7GQl09K3MU5Xbfc7gQJU2TWKxckIRdGmWpon+/c0ECMAz0Dtg16TyY1vD00MoaPGIwZJMKNlOdwRr5/eCtdpCZm3jtB0syifpTVoidZ2qPd0QzQJLEUk4zzjCaIO1O2tbyrpxtcN6Q3epNYTb9TArXn2yakXkZedD+Rzf9NcxfDXkgPSths2og+OvRm4G+Yx/khjvUpNWhvrzDgpaajPwrxiEEMfl0ymHlj4kYzVgU4ZPzeFnDgJj1CyeFMceUrMyObZnNL4LjqprJSx+noBngc1NYEXjzHlR6p2u38QuBNdDob1jhcIXrCYccEQIDAQAB",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzAVz5sh9bnDXXgLGn1fkvGYzPlFapepzYsOmXSftkLiMfd5C4VlyG6DCXjXomWNsY5rN44i7LRaG8ZkCvKHm2TLLjagkAEfiEX+UVyRntA0aNlwzVGaOO3Sl2T2aoqlf+ho7ANJEuvodqU6KS7tgn9WyGvitYaPCQ5y5pu2X5ZaDYCX5ZI+dhDBz3RMPe+qGL6Ohbn6uyyrxEo4GMKdeaxcMx5aG44IHMPeVOxYZ/j+z3Ll6CQHRofFSC+EIn1ncSLfDr14sTWT0y6grYlEIAEgEqEXEQDg95RoukF8DQjmUxYvVUkwLx6VSndWXZGb02z16RXHEiTwwYIWk1VfnGwIDAQAB",
   "version": "0.8.0",
   "description": "Capture a screenshot + description of a bug during a bug-bash session and send it to a configured intake service.",
   "action": {
