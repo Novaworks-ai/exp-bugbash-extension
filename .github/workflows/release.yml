@@ -26,7 +26,14 @@ jobs:
       - name: Build extension zip
         run: |
           zip_name="bug-bash-capture-${GITHUB_REF_NAME}.zip"
-          zip -r "$zip_name" manifest.json src icons -x "**/.DS_Store"
+          staging="$(mktemp -d)/bug-bash-capture"
+          mkdir -p "$staging"
+          cp -r src icons "$staging/"
+          # The "key" field pins the extension ID for unpacked/dev loads (stable
+          # OAuth redirect URI); the Web Store rejects an upload whose key
+          # doesn't match the already-published item's own identity, so omit it.
+          jq 'del(.key)' manifest.json > "$staging/manifest.json"
+          (cd "$staging" && zip -r "$OLDPWD/$zip_name" manifest.json src icons -x "**/.DS_Store")
 
       - name: Create or update GitHub release
         env:
