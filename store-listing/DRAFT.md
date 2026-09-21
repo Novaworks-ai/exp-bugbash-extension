@@ -71,10 +71,11 @@ view instead of a hosted HTML page — CWS review accepts this as a valid privac
 
 ## Assets still needed before submitting
 
-- [ ] At least one screenshot, 1280x800 or 640x400 (PNG/JPEG) — capture these from an actual run
-  of the popup (Capture tab, Queue tab with an item, the first-run Settings gate) once we've done
-  a working end-to-end trial. Not faked/mocked screenshots — CWS review checks these match real
-  behavior.
+- [x] At least one screenshot, 1280x800 or 640x400 (PNG/JPEG) —
+  `screenshots/screenshot-3-home.png` (640x400), from a real popup capture (merged
+  Capture/Queue home view, v0.7.5). Screenshots 1/2 are from the pre-merge Capture/Queue/
+  History/Settings tab layout (v0.2.0) — worth recapturing against current `main` before
+  submitting so all listing images reflect the same UI.
 - [ ] Store icon: 128x128 already exists at `icons/icon128.png`, reusable as-is.
 - [ ] Support email / contact — decide which address to list (personal vs. a shared Novaworks
   inbox).
