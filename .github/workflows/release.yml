@@ -24,13 +24,19 @@ jobs:
           fi
 
       - name: Build extension zip
-        run: git archive --format=zip --output="bug-bash-capture-${GITHUB_REF_NAME}.zip" HEAD
+        run: |
+          zip_name="bug-bash-capture-${GITHUB_REF_NAME}.zip"
+          zip -r "$zip_name" manifest.json src icons -x "**/.DS_Store"
 
-      - name: Create GitHub release
+      - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            "bug-bash-capture-${GITHUB_REF_NAME}.zip" \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes
+          zip_name="bug-bash-capture-${GITHUB_REF_NAME}.zip"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$zip_name" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$zip_name" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          fi
